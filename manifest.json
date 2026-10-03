@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "ubruckhaus.my-plugins",
+  "name": "My Plugins",
+  "version": "1.0.0",
+  "author": "uBruckhaus",
+  "license": "MIT",
+  "description": "Monitor Omarchy marketplace publication, views, downloads, and stars with live bar icon change indicators.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "My Plugins",
+    "description": "Omarchy marketplace publication status, views, downloads, and stars monitor",
+    "category": "Widgets",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}
