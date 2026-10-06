@@ -32,7 +32,7 @@ A native Omarchy desktop shell bar widget and panel that monitors your published
   - Each plugin card shows its current version from the installed manifest.
   - When the latest GitHub release differs, it is shown alongside (e.g. `v0.3.0 · GH v0.3.3`) so installed-vs-published drift is visible at a glance.
 - **🎯 One-Click Deep Links**:
-  - Jump directly to the Marketplace listing, pre-filtered to that plugin (`https://plugins.omarchy.org/?plugin=<plugin-id>`).
+  - Jump directly to the plugin's Marketplace detail page (`https://plugins.omarchy.org/plugin.html?id=<plugin-id>`).
   - Open the GitHub repository.
   - Track review/submission progress directly in GitHub Marketplace verification issues (e.g. #9889 for Simple Recipes, #9826 for Simple Tile).
 - **🔒 Omarchy Security Baseline**:

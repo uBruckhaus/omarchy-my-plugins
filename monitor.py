@@ -569,7 +569,7 @@ def query_metrics(author=None):
             "issue_number": issue_num,
             "issue_url": issue_url,
             "repo_url": repo_url,
-            "marketplace_url": f"https://plugins.omarchy.org/?plugin={pid}",
+            "marketplace_url": f"https://plugins.omarchy.org/plugin.html?id={pid}",
             "description": description
         }
         plugins_result.append(record)

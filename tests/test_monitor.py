@@ -325,10 +325,10 @@ class TestMonitor(unittest.TestCase):
         our_views = [p["views"] for p in res["plugins"] if p["id"].startswith("ubruckhaus.")]
         self.assertEqual(our_views, sorted(our_views, reverse=True))
 
-        # marketplace deep link filters the catalog to the plugin
+        # marketplace deep link opens the plugin's detail page
         for p in res["plugins"]:
             self.assertTrue(
-                p["marketplace_url"].startswith("https://plugins.omarchy.org/?plugin=" + p["id"])
+                p["marketplace_url"].startswith("https://plugins.omarchy.org/plugin.html?id=" + p["id"])
             )
 
         # every plugin record now carries version fields
