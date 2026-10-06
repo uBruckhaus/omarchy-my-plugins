@@ -229,6 +229,40 @@ def fetch_marketplace_issues(author=DEFAULT_AUTHOR):
         sys.stderr.write(f"Warning: Failed to fetch marketplace issues for author '{author}': {e}\n")
     return []
 
+def fetch_github_releases(author=DEFAULT_AUTHOR, repo_names=None):
+    """Latest release tag per repository: {repo_name: tagName}.
+
+    Repos without releases (or unreachable) are simply omitted.
+    """
+    releases = {}
+    if not repo_names:
+        return releases
+    for rname in repo_names:
+        if not rname:
+            continue
+        try:
+            res = subprocess.run(
+                ["gh", "release", "view", "--repo", f"{author}/{rname}", "--json", "tagName"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if res.returncode == 0:
+                tag = (json.loads(res.stdout).get("tagName") or "").strip()
+                if tag:
+                    releases[rname] = tag
+        except Exception:
+            pass
+    return releases
+
+def resolve_version(local_version, release_tag):
+    """Prefer the local (installed) version, fall back to the release tag."""
+    local = str(local_version or "").strip()
+    release = str(release_tag or "").strip()
+    if release[:1] in ("v", "V"):
+        release = release[1:]
+    return local or release
+
 def fetch_github_repos(author=DEFAULT_AUTHOR):
     try:
         res = subprocess.run(
@@ -276,17 +310,21 @@ def discover_plugins_by_author(author=DEFAULT_AUTHOR, repos=None, issues=None, s
 
                             clean_suffix = d.name.replace(f"{author}.", "")
                             repo_name = f"omarchy-{clean_suffix}"
+                            mf_version = m.get("version", "")
                             if pid not in discovered:
                                 discovered[pid] = {
                                     "id": pid,
                                     "name": name,
                                     "repo_name": repo_name,
                                     "display_icon": icon,
-                                    "description": m.get("description", "")
+                                    "description": m.get("description", ""),
+                                    "version": mf_version
                                 }
                             else:
                                 if not discovered[pid].get("description"):
                                     discovered[pid]["description"] = m.get("description", "")
+                                if not discovered[pid].get("version"):
+                                    discovered[pid]["version"] = mf_version
                     except Exception:
                         pass
 
@@ -435,6 +473,10 @@ def query_metrics(author=None):
     repos = fetch_github_repos(author=author)
 
     tracked = discover_plugins_by_author(author=author, repos=repos, issues=issues, stats=stats)
+    releases = fetch_github_releases(
+        author=author,
+        repo_names=[p.get("repo_name", "") for p in tracked]
+    )
 
     # Load baseline acknowledged state
     ack_state = load_json_file(ack_file, fallback={})
@@ -465,6 +507,11 @@ def query_metrics(author=None):
         stars = int(rp.get("stargazerCount", 0))
         repo_url = rp.get("url", f"https://github.com/{author}/{repo_name}")
         description = p.get("description") or rp.get("description", "")
+
+        release_tag = releases.get(repo_name, "")
+        release_version = release_tag[1:] if release_tag[:1] in ("v", "V") else release_tag
+        local_version = str(p.get("version", "") or "").strip()
+        version = local_version or release_version
 
         status_text, status_code, issue_num, issue_url = determine_status(p, issues)
         publish_date = determine_publish_date(p, issues)
@@ -504,6 +551,9 @@ def query_metrics(author=None):
             "repo_name": repo_name,
             "display_icon": icon,
             "publish_date": publish_date,
+            "version": version,
+            "local_version": local_version,
+            "release_version": release_version,
             "views": views,
             "views_delta": views_delta,
             "downloads": downloads,

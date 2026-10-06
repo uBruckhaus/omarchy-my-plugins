@@ -635,11 +635,25 @@ Ui.Panel {
                                 width: parent.width
                                 spacing: Style.space(14)
 
-                                // 1st Column: Published Date
+                                // Version: installed version, with the published
+                                // GitHub release alongside when it differs.
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "📅 Date:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: modelData.publish_date || "—"; color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { text: "📦 Ver:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text {
+                                        text: {
+                                            var v = modelData.local_version || modelData.release_version || ""
+                                            if (v === "") return "—"
+                                            var out = "v" + v
+                                            if (modelData.local_version !== "" && modelData.release_version !== "" && modelData.local_version !== modelData.release_version) {
+                                                out += " · GH v" + modelData.release_version
+                                            }
+                                            return out
+                                        }
+                                        color: Color.foreground
+                                        font.bold: true
+                                        font.pixelSize: Style.font.caption
+                                    }
                                 }
 
                                 // Views

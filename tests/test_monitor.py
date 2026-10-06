@@ -255,6 +255,13 @@ class TestMonitor(unittest.TestCase):
         self.assertEqual(cfg["sort_by"], "downloads")
         self.assertEqual(cfg["sort_order"], "asc")
 
+    def test_resolve_version(self):
+        self.assertEqual(monitor.resolve_version("0.8.0", "v0.8.0"), "0.8.0")
+        self.assertEqual(monitor.resolve_version("", "v0.2.6"), "0.2.6")
+        self.assertEqual(monitor.resolve_version("1.3.2", ""), "1.3.2")
+        self.assertEqual(monitor.resolve_version("", ""), "")
+        self.assertEqual(monitor.resolve_version("0.3.0", "v0.3.3"), "0.3.0")
+
     def test_handle_request_configure_sort(self):
         state_dir = monitor.get_state_dir()
         snapshot_file = state_dir / "snapshot.json"
@@ -299,21 +306,34 @@ class TestMonitor(unittest.TestCase):
         orig_stats = monitor.fetch_marketplace_stats
         orig_issues = monitor.fetch_marketplace_issues
         orig_repos = monitor.fetch_github_repos
+        orig_releases = monitor.fetch_github_releases
         monitor.fetch_marketplace_stats = lambda author=None: stats
         monitor.fetch_marketplace_issues = lambda author=None: []
         monitor.fetch_github_repos = lambda author=None: {}
+        monitor.fetch_github_releases = lambda author=None, repo_names=None: {}
         try:
             res = monitor.query_metrics()
         finally:
             monitor.fetch_marketplace_stats = orig_stats
             monitor.fetch_marketplace_issues = orig_issues
             monitor.fetch_github_repos = orig_repos
+            monitor.fetch_github_releases = orig_releases
 
         self.assertEqual(res["sort_by"], "views")
         self.assertEqual(res["sort_order"], "desc")
 
         our_views = [p["views"] for p in res["plugins"] if p["id"].startswith("ubruckhaus.")]
         self.assertEqual(our_views, sorted(our_views, reverse=True))
+
+        # every plugin record now carries version fields
+        for p in res["plugins"]:
+            self.assertIn("version", p)
+            self.assertIn("local_version", p)
+            self.assertIn("release_version", p)
+
+        # installed plugins picked up their manifest version
+        by_id = {p["id"]: p for p in res["plugins"]}
+        self.assertTrue(by_id["ubruckhaus.simple-tile"]["local_version"])
 
         # get_current_status re-sorts cached snapshot with same result
         res2 = monitor.get_current_status()

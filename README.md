@@ -28,6 +28,9 @@ A native Omarchy desktop shell bar widget and panel that monitors your published
   - Each with **Ascending** or **Descending** order.
   - Default: **Views, Descending**.
   - Adjust anytime directly from the panel dropdowns or CLI.
+- **📦 Version Display**:
+  - Each plugin card shows its current version from the installed manifest.
+  - When the latest GitHub release differs, it is shown alongside (e.g. `v0.3.0 · GH v0.3.3`) so installed-vs-published drift is visible at a glance.
 - **🎯 One-Click Deep Links**:
   - Jump directly to the Marketplace listing (`https://plugins.omarchy.org/#<plugin>`).
   - Open the GitHub repository.
