@@ -23,6 +23,11 @@ A native Omarchy desktop shell bar widget and panel that monitors your published
   - Query frequency configurable in minutes: `1m`, `2m`, `5m`, `10m`, `15m`, `30m`, `60m`.
   - Default: **5 minutes**.
   - Adjust anytime directly from the panel or CLI.
+- **↕ Sortable Plugin List**:
+  - Sort the plugin list by **Views**, **Downloads**, **Hearts**, **GitHub Stars**, **Name**, or **Publish Date**.
+  - Each with **Ascending** or **Descending** order.
+  - Default: **Views, Descending**.
+  - Adjust anytime directly from the panel dropdowns or CLI.
 - **🎯 One-Click Deep Links**:
   - Jump directly to the Marketplace listing (`https://plugins.omarchy.org/#<plugin>`).
   - Open the GitHub repository.
@@ -72,7 +77,12 @@ python3 monitor.py --acknowledge
 
 # Change polling interval (e.g. to 10 minutes)
 python3 monitor.py --set-interval 10
+
+# Change plugin list sorting (field: views|downloads|hearts|stars|name|date, order: asc|desc)
+python3 monitor.py --set-sort views desc
 ```
+
+The default sort order is **views, descending** — the plugin list is always ordered by the configured field.
 
 ---
 

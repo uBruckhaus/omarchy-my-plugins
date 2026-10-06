@@ -3,7 +3,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "native/Commons"
-import qs.Commons as Theme
 import "native/Ui" as Ui
 import qs.Ui as ShellUi
 
@@ -14,6 +13,7 @@ ShellUi.BarWidget {
     property bool opened: panel.opened
     property bool popoutSwitchClosing: panel.popoutSwitchClosing
 
+    property string author: "ubruckhaus"
     property int intervalMinutes: Math.max(1, Number(setting("intervalMinutes", 5)) || 5)
     property var plugins: []
     property int totalViews: 0
@@ -24,12 +24,24 @@ ShellUi.BarWidget {
     property string changesSummary: ""
     property string lastUpdatedText: ""
     property bool isQuerying: false
+    property string sortBy: "views"
+    property string sortOrder: "desc"
 
     property var pendingRequests: []
     property var currentRequest: null
 
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
+
+    IpcHandler {
+        target: "ubruckhaus.my-plugins"
+        function toggle(): void { root.togglePanel() }
+        function open(): void { panel.open() }
+        function close(): void { panel.close() }
+        function refresh(): void { root.request({command: "query"}) }
+        function acknowledge(): void { root.acknowledgeChanges() }
+        function setAuthor(authorName: string): void { root.request({command: "set_author", author: authorName}) }
+    }
 
     function helperScriptPath() {
         return decodeURIComponent(Qt.resolvedUrl("monitor.py").toString().replace(/^file:\/\//, ""))
@@ -55,6 +67,7 @@ ShellUi.BarWidget {
         try {
             var data = JSON.parse(text)
             if (data.status === "ok") {
+                if (data.author !== undefined) root.author = data.author
                 if (data.plugins !== undefined) root.plugins = data.plugins
                 if (data.total_views !== undefined) root.totalViews = data.total_views
                 if (data.total_downloads !== undefined) root.totalDownloads = data.total_downloads
@@ -66,6 +79,12 @@ ShellUi.BarWidget {
                 if (data.interval_minutes !== undefined && data.interval_minutes !== root.intervalMinutes) {
                     root.intervalMinutes = data.interval_minutes
                 }
+                if (data.sort_by !== undefined && data.sort_by !== root.sortBy) {
+                    root.sortBy = data.sort_by
+                }
+                if (data.sort_order !== undefined && data.sort_order !== root.sortOrder) {
+                    root.sortOrder = data.sort_order
+                }
             }
         } catch (e) {
             console.warn("My Plugins: Failed to parse backend response", e)
@@ -75,6 +94,12 @@ ShellUi.BarWidget {
     function setIntervalMinutes(m) {
         root.intervalMinutes = m
         request({command: "configure", settings: {interval_minutes: m}})
+    }
+
+    function setSort(by, order) {
+        if (by) root.sortBy = by
+        if (order) root.sortOrder = order
+        request({command: "configure", settings: {sort_by: by, sort_order: order}})
     }
 
     function acknowledgeChanges() {
@@ -136,6 +161,7 @@ ShellUi.BarWidget {
         bar: root.bar
         anchorItem: button
         hostWidget: root
+        author: root.author
         plugins: root.plugins
         totalViews: root.totalViews
         totalDownloads: root.totalDownloads
@@ -146,10 +172,13 @@ ShellUi.BarWidget {
         intervalMinutes: root.intervalMinutes
         lastUpdatedText: root.lastUpdatedText
         isQuerying: root.isQuerying
+        sortBy: root.sortBy
+        sortOrder: root.sortOrder
 
         onRefreshRequested: root.request({command: "query"})
         onAcknowledgeRequested: root.acknowledgeChanges()
         onIntervalSelected: function(m) { root.setIntervalMinutes(m) }
+        onSortChanged: function(by, order) { root.setSort(by, order) }
         onOpenUrl: function(url) { root.openExternalUrl(url) }
     }
 
@@ -161,7 +190,7 @@ ShellUi.BarWidget {
         active: root.opened || root.hasChanges
 
         tooltipText: {
-            var prefix = "My Plugins · Marketplace Monitor\n"
+            var prefix = "My Plugins · @" + root.author + " · Marketplace Monitor\n"
             if (root.hasChanges) {
                 return prefix + "⚡ New updates detected!\n" + (root.changesSummary !== "" ? root.changesSummary : "Metrics changed") + "\nClick to open · Right-click to refresh"
             }
@@ -223,7 +252,7 @@ ShellUi.BarWidget {
                     width: 7
                     height: 7
                     radius: 3.5
-                    color: Theme.Color.accent
+                    color: Color.accent
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.topMargin: 1

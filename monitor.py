@@ -18,36 +18,49 @@ from pathlib import Path
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
+DEFAULT_AUTHOR = "ubruckhaus"
+
+# Sortable fields for the plugin list and their display labels
+SORT_FIELDS = ["views", "downloads", "hearts", "stars", "name", "date"]
+SORT_ORDERS = ["asc", "desc"]
+DEFAULT_SORT_BY = "views"
+DEFAULT_SORT_ORDER = "desc"
+
 DEFAULT_PLUGINS = [
     {
         "name": "Simple Launcher",
         "id": "ubruckhaus.simple-launcher-for-fools",
         "repo_name": "omarchy-simple-launcher-for-fools",
-        "display_icon": "rocket"
+        "display_icon": "rocket",
+        "publish_date": "2026-09-27"
     },
     {
         "name": "Simple Tile",
         "id": "ubruckhaus.simple-tile",
         "repo_name": "omarchy-simple-tile",
-        "display_icon": "tile"
+        "display_icon": "tile",
+        "publish_date": "2026-09-28"
     },
     {
         "name": "Video Trans",
         "id": "ubruckhaus.video-trans",
         "repo_name": "omarchy-video-trans",
-        "display_icon": "video"
+        "display_icon": "video",
+        "publish_date": "2026-10-01"
     },
     {
         "name": "Simple Reader",
         "id": "ubruckhaus.simple-reader",
         "repo_name": "omarchy-simple-reader",
-        "display_icon": "reader"
+        "display_icon": "reader",
+        "publish_date": "2026-10-01"
     },
     {
         "name": "Simple Recipes",
         "id": "ubruckhaus.simple-recipes",
         "repo_name": "omarchy-simple-recipes",
-        "display_icon": "recipes"
+        "display_icon": "recipes",
+        "publish_date": "2026-10-03"
     }
 ]
 
@@ -143,11 +156,21 @@ def load_config():
     if cfg_file.is_file():
         try:
             with open(cfg_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if "author" not in data:
+                    data["author"] = DEFAULT_AUTHOR
+                if data.get("sort_by") not in SORT_FIELDS:
+                    data["sort_by"] = DEFAULT_SORT_BY
+                if data.get("sort_order") not in SORT_ORDERS:
+                    data["sort_order"] = DEFAULT_SORT_ORDER
+                return data
         except Exception:
             pass
     return {
+        "author": DEFAULT_AUTHOR,
         "interval_minutes": 5,
+        "sort_by": DEFAULT_SORT_BY,
+        "sort_order": DEFAULT_SORT_ORDER,
         "plugins": DEFAULT_PLUGINS
     }
 
@@ -178,21 +201,24 @@ def save_json_file(path, data):
         json.dump(data, f, indent=2)
     os.replace(tmp, path)
 
-def fetch_marketplace_stats():
+def fetch_marketplace_stats(author=DEFAULT_AUTHOR):
     url = "https://api.omarchyplugins.com/v1/stats"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "OmarchyMyPlugins/1.0"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-            return data.get("plugins", {})
+            all_plugins = data.get("plugins", {})
+            prefix = author.lower() + "."
+            author_stats = {k: v for k, v in all_plugins.items() if k.lower().startswith(prefix)}
+            return author_stats if author_stats else all_plugins
     except Exception as e:
-        sys.stderr.write(f"Warning: Failed to fetch marketplace stats: {e}\n")
+        sys.stderr.write(f"Warning: Failed to fetch marketplace stats for author '{author}': {e}\n")
         return {}
 
-def fetch_marketplace_issues():
+def fetch_marketplace_issues(author=DEFAULT_AUTHOR):
     try:
         res = subprocess.run(
-            ["gh", "issue", "list", "--repo", "omacom/omarchy-plugin-marketplace", "--search", "ubruckhaus", "--state", "all", "--json", "number,title,state,labels,updatedAt,url"],
+            ["gh", "issue", "list", "--repo", "omacom/omarchy-plugin-marketplace", "--author", author, "--state", "all", "--json", "number,title,state,labels,createdAt,closedAt,updatedAt,url"],
             capture_output=True,
             text=True,
             timeout=6
@@ -200,13 +226,13 @@ def fetch_marketplace_issues():
         if res.returncode == 0:
             return json.loads(res.stdout)
     except Exception as e:
-        sys.stderr.write(f"Warning: Failed to fetch marketplace issues: {e}\n")
+        sys.stderr.write(f"Warning: Failed to fetch marketplace issues for author '{author}': {e}\n")
     return []
 
-def fetch_github_repos():
+def fetch_github_repos(author=DEFAULT_AUTHOR):
     try:
         res = subprocess.run(
-            ["gh", "repo", "list", "uBruckhaus", "--json", "name,stargazerCount,url,description"],
+            ["gh", "repo", "list", author, "--json", "name,description,stargazerCount,url,createdAt,pushedAt"],
             capture_output=True,
             text=True,
             timeout=6
@@ -215,16 +241,161 @@ def fetch_github_repos():
             repos_list = json.loads(res.stdout)
             return {r["name"]: r for r in repos_list}
     except Exception as e:
-        sys.stderr.write(f"Warning: Failed to fetch github repos: {e}\n")
+        sys.stderr.write(f"Warning: Failed to fetch github repos for author '{author}': {e}\n")
     return {}
 
-def determine_status(plugin_name, issues):
-    # Match issues by plugin name
+def discover_plugins_by_author(author=DEFAULT_AUTHOR, repos=None, issues=None, stats=None):
+    discovered = {}
+
+    # Seed with DEFAULT_PLUGINS matching this author
+    for p in DEFAULT_PLUGINS:
+        if p["id"].lower().startswith(author.lower() + ".") or author.lower() in p["id"].lower():
+            discovered[p["id"]] = dict(p)
+
+    # 1. Local installed plugins in ~/.config/omarchy/plugins/
+    p_dir = Path.home() / ".config" / "omarchy" / "plugins"
+    if p_dir.is_dir():
+        for d in p_dir.iterdir():
+            if d.is_dir() and not d.name.endswith(".my-plugins"):
+                mf = d / "manifest.json"
+                if mf.is_file():
+                    try:
+                        with open(mf, "r", encoding="utf-8") as f:
+                            m = json.load(f)
+                        pid = m.get("id", "")
+                        p_auth = m.get("author", "").lower()
+                        if p_auth == author.lower() or "uwe bruckhaus" in p_auth or pid.lower().startswith(author.lower() + "."):
+                            name = m.get("name", "")
+                            icon = "plugin"
+                            nl = name.lower()
+                            if "launcher" in nl: icon = "rocket"
+                            elif "tile" in nl: icon = "tile"
+                            elif "video" in nl: icon = "video"
+                            elif "reader" in nl: icon = "reader"
+                            elif "recipe" in nl: icon = "recipes"
+
+                            clean_suffix = d.name.replace(f"{author}.", "")
+                            repo_name = f"omarchy-{clean_suffix}"
+                            if pid not in discovered:
+                                discovered[pid] = {
+                                    "id": pid,
+                                    "name": name,
+                                    "repo_name": repo_name,
+                                    "display_icon": icon,
+                                    "description": m.get("description", "")
+                                }
+                            else:
+                                if not discovered[pid].get("description"):
+                                    discovered[pid]["description"] = m.get("description", "")
+                    except Exception:
+                        pass
+
+    # 2. GitHub repos for author
+    if repos:
+        for rname, r in repos.items():
+            if rname in ("omarchy-my-plugins", "my-plugins"):
+                continue
+            clean_name = rname.replace("omarchy-", "")
+            matched_pid = None
+            for pid, pdata in discovered.items():
+                if pdata.get("repo_name") == rname or clean_name in pid:
+                    matched_pid = pid
+                    break
+            if not matched_pid:
+                matched_pid = f"{author}.{clean_name}"
+                pname = clean_name.replace("-", " ").title()
+                icon = "plugin"
+                nl = pname.lower()
+                if "launcher" in nl: icon = "rocket"
+                elif "tile" in nl: icon = "tile"
+                elif "video" in nl: icon = "video"
+                elif "reader" in nl: icon = "reader"
+                elif "recipe" in nl: icon = "recipes"
+
+                discovered[matched_pid] = {
+                    "id": matched_pid,
+                    "name": pname,
+                    "repo_name": rname,
+                    "display_icon": icon,
+                    "description": r.get("description", "")
+                }
+            if r.get("description") and not discovered[matched_pid].get("description"):
+                discovered[matched_pid]["description"] = r.get("description")
+
+    # 3. Stats keys for author
+    if stats:
+        for pid in stats.keys():
+            if pid not in discovered and pid.lower().startswith(author.lower() + "."):
+                clean_name = pid.replace(f"{author}.", "")
+                pname = clean_name.replace("-", " ").title()
+                discovered[pid] = {
+                    "id": pid,
+                    "name": pname,
+                    "repo_name": f"omarchy-{clean_name}",
+                    "display_icon": "plugin"
+                }
+
+    result = list(discovered.values())
+    result.sort(key=lambda x: x.get("publish_date") or "9999")
+    return result
+
+def determine_publish_date(plugin_dict, issues):
+    if plugin_dict.get("publish_date"):
+        return plugin_dict["publish_date"]
+
+    known_dates = {
+        "ubruckhaus.simple-launcher-for-fools": "2026-09-27",
+        "ubruckhaus.simple-tile": "2026-09-28",
+        "ubruckhaus.video-trans": "2026-10-01",
+        "ubruckhaus.simple-reader": "2026-10-01",
+        "ubruckhaus.simple-recipes": "2026-10-03",
+    }
+    pid = plugin_dict.get("id", "")
+    if pid in known_dates:
+        return known_dates[pid]
+
+    pname_lower = plugin_dict.get("name", "").lower()
+    clean_id = pid.split(".")[-1].lower() if pid and "." in pid else (pid.lower() if pid else "")
+    repo_clean = plugin_dict.get("repo_name", "").replace("omarchy-", "").lower()
+
     matching = []
-    pname_lower = plugin_name.lower()
     for i in issues:
         title_lower = i.get("title", "").lower()
-        if pname_lower in title_lower:
+        if (pname_lower and pname_lower in title_lower) or \
+           (clean_id and clean_id in title_lower) or \
+           (repo_clean and repo_clean in title_lower):
+            matching.append(i)
+
+    if matching:
+        matching.sort(key=lambda x: x.get("createdAt", ""))
+        earliest = matching[0]
+        if earliest.get("closedAt"):
+            return earliest["closedAt"][:10]
+        if earliest.get("createdAt"):
+            return earliest["createdAt"][:10]
+
+    return ""
+
+def determine_status(plugin_or_name, issues):
+    if isinstance(plugin_or_name, dict):
+        pname = plugin_or_name.get("name", "")
+        pid = plugin_or_name.get("id", "")
+        repo_name = plugin_or_name.get("repo_name", "")
+    else:
+        pname = str(plugin_or_name)
+        pid = ""
+        repo_name = ""
+
+    matching = []
+    pname_lower = pname.lower()
+    clean_id = pid.split(".")[-1].lower() if pid and "." in pid else pid.lower()
+    rname_clean = repo_name.replace("omarchy-", "").lower()
+
+    for i in issues:
+        title_lower = i.get("title", "").lower()
+        if (pname_lower and pname_lower in title_lower) or \
+           (clean_id and clean_id in title_lower) or \
+           (rname_clean and rname_clean in title_lower):
             matching.append(i)
 
     if not matching:
@@ -250,18 +421,20 @@ def determine_status(plugin_name, issues):
 
     return "Listed", "listed", iss_num, iss_url
 
-def query_metrics():
+def query_metrics(author=None):
     state_dir = get_state_dir()
     snapshot_file = state_dir / "snapshot.json"
     ack_file = state_dir / "acknowledged.json"
 
     cfg = load_config()
-    tracked = cfg.get("plugins", DEFAULT_PLUGINS)
+    author = (author or cfg.get("author", DEFAULT_AUTHOR)).strip()
     interval = cfg.get("interval_minutes", 5)
 
-    stats = fetch_marketplace_stats()
-    issues = fetch_marketplace_issues()
-    repos = fetch_github_repos()
+    stats = fetch_marketplace_stats(author=author)
+    issues = fetch_marketplace_issues(author=author)
+    repos = fetch_github_repos(author=author)
+
+    tracked = discover_plugins_by_author(author=author, repos=repos, issues=issues, stats=stats)
 
     # Load baseline acknowledged state
     ack_state = load_json_file(ack_file, fallback={})
@@ -290,10 +463,11 @@ def query_metrics():
 
         rp = repos.get(repo_name, {})
         stars = int(rp.get("stargazerCount", 0))
-        repo_url = rp.get("url", f"https://github.com/uBruckhaus/{repo_name}")
-        description = rp.get("description", "")
+        repo_url = rp.get("url", f"https://github.com/{author}/{repo_name}")
+        description = p.get("description") or rp.get("description", "")
 
-        status_text, status_code, issue_num, issue_url = determine_status(pname, issues)
+        status_text, status_code, issue_num, issue_url = determine_status(p, issues)
+        publish_date = determine_publish_date(p, issues)
 
         total_views += views
         total_downloads += downloads
@@ -329,6 +503,7 @@ def query_metrics():
             "name": pname,
             "repo_name": repo_name,
             "display_icon": icon,
+            "publish_date": publish_date,
             "views": views,
             "views_delta": views_delta,
             "downloads": downloads,
@@ -359,8 +534,13 @@ def query_metrics():
     now_iso = datetime.now(timezone.utc).isoformat()
     changes_summary = "; ".join(changes_list) if changes_list else ""
 
+    cfg_sort_by = cfg.get("sort_by", DEFAULT_SORT_BY)
+    cfg_sort_order = cfg.get("sort_order", DEFAULT_SORT_ORDER)
+    plugins_result = sort_plugins(plugins_result, cfg_sort_by, cfg_sort_order)
+
     result = {
         "status": "ok",
+        "author": author,
         "last_updated": now_iso,
         "interval_minutes": interval,
         "has_changes": has_changes,
@@ -369,6 +549,8 @@ def query_metrics():
         "total_downloads": total_downloads,
         "total_hearts": total_hearts,
         "total_stars": total_stars,
+        "sort_by": cfg_sort_by,
+        "sort_order": cfg_sort_order,
         "plugins": plugins_result,
         "plugins_map": plugins_map
     }
@@ -392,14 +574,14 @@ def query_metrics():
     save_json_file(snapshot_file, result)
     return result
 
-def acknowledge_changes():
+def acknowledge_changes(author=None):
     state_dir = get_state_dir()
     snapshot_file = state_dir / "snapshot.json"
     ack_file = state_dir / "acknowledged.json"
 
     data = load_json_file(snapshot_file)
     if not data:
-        data = query_metrics()
+        data = query_metrics(author=author)
 
     plugins_map = data.get("plugins_map", {})
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -419,16 +601,75 @@ def acknowledge_changes():
         p["stars_delta"] = 0
         p["status_changed"] = False
 
+    data = apply_sort(data)
     save_json_file(snapshot_file, data)
     return data
 
-def get_current_status():
+def get_current_status(author=None):
     state_dir = get_state_dir()
     snapshot_file = state_dir / "snapshot.json"
     data = load_json_file(snapshot_file)
     if not data:
-        return query_metrics()
+        return query_metrics(author=author)
+    # Re-apply the current sort configuration so cached snapshots
+    # always follow the configured order, even if sorted earlier.
+    return apply_sort(data)
+
+def sort_plugins(plugins, sort_by=DEFAULT_SORT_BY, sort_order=DEFAULT_SORT_ORDER):
+    """Return a new list of plugin records sorted by `sort_by`/`sort_order`.
+
+    Fields: views, downloads, hearts, stars, name, date (publish date).
+    Ties always keep a deterministic ascending-name order (stable sort).
+    """
+    if sort_by not in SORT_FIELDS:
+        sort_by = DEFAULT_SORT_BY
+    if sort_order not in SORT_ORDERS:
+        sort_order = DEFAULT_SORT_ORDER
+    reverse = (sort_order == "desc")
+
+    def tiebreak(p):
+        return ((p.get("name") or "").lower(), p.get("id") or "")
+
+    if sort_by == "name":
+        keyfn = lambda p: (p.get("name") or "").lower()
+    elif sort_by == "date":
+        keyfn = lambda p: p.get("publish_date") or ""
+    else:
+        def keyfn(p):
+            try:
+                return int(p.get(sort_by) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+    ordered = sorted(plugins, key=tiebreak)
+    return sorted(ordered, key=keyfn, reverse=reverse)
+
+def apply_sort(data):
+    """Sort the plugins list of a result dict in place using current config."""
+    if not isinstance(data, dict) or not isinstance(data.get("plugins"), list):
+        return data
+    cfg = load_config()
+    sort_by = cfg.get("sort_by") or data.get("sort_by") or DEFAULT_SORT_BY
+    sort_order = cfg.get("sort_order") or data.get("sort_order") or DEFAULT_SORT_ORDER
+    data["plugins"] = sort_plugins(data["plugins"], sort_by, sort_order)
+    data["sort_by"] = sort_by
+    data["sort_order"] = sort_order
     return data
+
+def set_sort(sort_by=None, sort_order=None):
+    cfg = load_config()
+    if sort_by is not None:
+        s = str(sort_by).strip().lower()
+        if s not in SORT_FIELDS:
+            return {"status": "error", "message": f"invalid sort_by '{sort_by}' (choose from: {', '.join(SORT_FIELDS)})"}
+        cfg["sort_by"] = s
+    if sort_order is not None:
+        o = str(sort_order).strip().lower()
+        if o not in SORT_ORDERS:
+            return {"status": "error", "message": f"invalid sort_order '{sort_order}' (choose from: {', '.join(SORT_ORDERS)})"}
+        cfg["sort_order"] = o
+    save_config(cfg)
+    return {"status": "ok", "sort_by": cfg["sort_by"], "sort_order": cfg["sort_order"]}
 
 def set_interval(minutes):
     try:
@@ -439,6 +680,18 @@ def set_interval(minutes):
         cfg["interval_minutes"] = m
         save_config(cfg)
         return {"status": "ok", "interval_minutes": m}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def set_author(author):
+    try:
+        a = str(author).strip()
+        if not a:
+            return {"status": "error", "message": "empty author"}
+        cfg = load_config()
+        cfg["author"] = a
+        save_config(cfg)
+        return {"status": "ok", "author": a}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -453,17 +706,33 @@ def open_url(url):
 
 def handle_request(req):
     cmd = req.get("command", "")
+    author = req.get("author")
     if cmd == "query":
-        return query_metrics()
+        return query_metrics(author=author)
     elif cmd == "status":
-        return get_current_status()
+        return get_current_status(author=author)
     elif cmd == "acknowledge":
-        return acknowledge_changes()
+        return acknowledge_changes(author=author)
     elif cmd == "configure":
         settings = req.get("settings", {})
         if "interval_minutes" in settings:
             set_interval(settings["interval_minutes"])
-        return get_current_status()
+        if "author" in settings:
+            set_author(settings["author"])
+        if "sort_by" in settings or "sort_order" in settings:
+            res = set_sort(settings.get("sort_by"), settings.get("sort_order"))
+            if res.get("status") != "ok":
+                return res
+        return get_current_status(author=settings.get("author"))
+    elif cmd == "set_sort":
+        res = set_sort(req.get("sort_by"), req.get("sort_order"))
+        if res.get("status") != "ok":
+            return res
+        return get_current_status(author=author)
+    elif cmd == "set_author":
+        if "author" in req:
+            set_author(req["author"])
+        return query_metrics(author=req.get("author"))
     elif cmd == "open_url":
         return open_url(req.get("url", ""))
     else:
@@ -472,23 +741,39 @@ def handle_request(req):
 def main():
     if len(sys.argv) > 1:
         arg = sys.argv[1]
+        author = None
+        if "--author" in sys.argv:
+            idx = sys.argv.index("--author")
+            if idx + 1 < len(sys.argv):
+                author = sys.argv[idx + 1]
+
         if arg == "--query":
-            res = query_metrics()
+            res = query_metrics(author=author)
             print(json.dumps(res, indent=2))
         elif arg == "--status":
-            res = get_current_status()
+            res = get_current_status(author=author)
             print(json.dumps(res, indent=2))
         elif arg == "--acknowledge":
-            res = acknowledge_changes()
+            res = acknowledge_changes(author=author)
             print(json.dumps(res, indent=2))
         elif arg == "--set-interval" and len(sys.argv) > 2:
             res = set_interval(sys.argv[2])
             print(json.dumps(res, indent=2))
+        elif arg == "--set-author" and len(sys.argv) > 2:
+            res = set_author(sys.argv[2])
+            print(json.dumps(res, indent=2))
+        elif arg == "--set-sort" and len(sys.argv) > 3:
+            res = set_sort(sys.argv[2], sys.argv[3])
+            print(json.dumps(res, indent=2))
         elif arg == "--open" and len(sys.argv) > 2:
             res = open_url(sys.argv[2])
             print(json.dumps(res, indent=2))
+        elif arg == "--author" and len(sys.argv) > 2:
+            res = query_metrics(author=sys.argv[2])
+            print(json.dumps(res, indent=2))
         else:
-            print("Usage: monitor.py [--query | --status | --acknowledge | --set-interval <min> | --open <url>]")
+            print("Usage: monitor.py [--query [--author <name>] | --status | --acknowledge | --set-interval <min> | --set-author <name> | --set-sort <field> <asc|desc> | --open <url>]")
+            print(f"  sort <field> one of: {', '.join(SORT_FIELDS)}")
         return
 
     # Stdin JSON mode (used by Quickshell Process)

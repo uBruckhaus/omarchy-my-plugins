@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls as Controls
 import Quickshell
 import "native/Commons"
-import qs.Commons as Theme
 import "native/Ui" as Ui
 
 Ui.Panel {
@@ -13,6 +12,7 @@ Ui.Panel {
     property var anchorItem: null
     property var hostWidget: null
 
+    property string author: "ubruckhaus"
     property var plugins: []
     property int totalViews: 0
     property int totalDownloads: 0
@@ -23,10 +23,13 @@ Ui.Panel {
     property int intervalMinutes: 5
     property string lastUpdatedText: ""
     property bool isQuerying: false
+    property string sortBy: "views"
+    property string sortOrder: "desc"
 
     signal refreshRequested()
     signal acknowledgeRequested()
     signal intervalSelected(int minutes)
+    signal sortChanged(string sortBy, string sortOrder)
     signal openUrl(string url)
 
     function formatTime(isoString) {
@@ -49,7 +52,7 @@ Ui.Panel {
         anchorItem: root.anchorItem
         owner: root.hostWidget || root
         open: root.opened
-        contentWidth: fittedContentWidth(Style.space(520))
+        contentWidth: fittedContentWidth(Style.space(540))
         contentHeight: fittedContentHeight(content.implicitHeight, Style.space(660))
 
         Flickable {
@@ -81,24 +84,41 @@ Ui.Panel {
                         Text {
                             text: "🛍️"
                             font.pixelSize: Style.font.title
-                            anchors.verticalCenter: parent.verticalCenter
                         }
 
                         Column {
-                            anchors.verticalCenter: parent.verticalCenter
-                            Text {
-                                text: "My Plugins"
-                                color: Theme.Color.accent
-                                font.family: Theme.Style.font.family
-                                font.pixelSize: Theme.Style.font.title
-                                font.bold: true
+                            Row {
+                                spacing: Style.space(6)
+                                Text {
+                                    text: "My Plugins"
+                                    color: Color.accent
+                                    font.family: Style.font.family
+                                    font.pixelSize: Style.font.title
+                                    font.bold: true
+                                }
+                                Rectangle {
+                                    height: Style.space(16)
+                                    width: authorBadgeText.implicitWidth + Style.space(8)
+                                    radius: Style.space(8)
+                                    color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    Text {
+                                        id: authorBadgeText
+                                        anchors.centerIn: parent
+                                        text: "@" + root.author
+                                        color: Color.accent
+                                        font.family: Style.font.family
+                                        font.pixelSize: Style.font.caption - 1
+                                        font.bold: true
+                                    }
+                                }
                             }
                             Text {
                                 text: "Omarchy Marketplace & GitHub Monitor"
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 opacity: 0.6
-                                font.family: Theme.Style.font.family
-                                font.pixelSize: Theme.Style.font.caption
+                                font.family: Style.font.family
+                                font.pixelSize: Style.font.caption
                             }
                         }
                     }
@@ -133,11 +153,11 @@ Ui.Panel {
                 Rectangle {
                     width: parent.width
                     height: bannerCol.implicitHeight + Style.space(16)
-                    radius: Style.radius(6)
+                    radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
                     visible: root.hasChanges
-                    color: Qt.rgba(Theme.Color.accent.r, Theme.Color.accent.g, Theme.Color.accent.b, 0.12)
+                    color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
                     border.width: 1
-                    border.color: Theme.Color.accent
+                    border.color: Color.accent
 
                     Column {
                         id: bannerCol
@@ -145,28 +165,32 @@ Ui.Panel {
                         anchors.margins: Style.space(8)
                         spacing: Style.space(4)
 
-                        Row {
+                        Item {
                             width: parent.width
-                            spacing: Style.space(6)
+                            height: Style.space(26)
 
-                            Text {
-                                text: "⚡"
-                                font.pixelSize: Style.font.body
+                            Row {
+                                anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                            }
+                                spacing: Style.space(6)
 
-                            Text {
-                                text: "New updates detected!"
-                                color: Theme.Color.accent
-                                font.family: Theme.Style.font.family
-                                font.pixelSize: Theme.Style.font.body
-                                font.bold: true
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
+                                Text {
+                                    text: "⚡"
+                                    font.pixelSize: Style.font.body
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
 
-                            Item { Layout.fillWidth: true; width: 10 }
+                                Text {
+                                    text: "New updates detected!"
+                                    color: Color.accent
+                                    font.pixelSize: Style.font.body
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
 
                             Ui.Button {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
                                 implicitHeight: Style.space(22)
                                 text: "✓ Mark as Read"
                                 fontSize: Style.font.caption
@@ -179,9 +203,9 @@ Ui.Panel {
                         Text {
                             width: parent.width
                             text: root.changesSummary !== "" ? root.changesSummary : "Metrics or status updated in latest query."
-                            color: Theme.Color.foreground
-                            font.family: Theme.Style.font.family
-                            font.pixelSize: Theme.Style.font.caption
+                            color: Color.foreground
+                            font.family: Style.font.family
+                            font.pixelSize: Style.font.caption
                             wrapMode: Text.Wrap
                         }
                     }
@@ -196,24 +220,24 @@ Ui.Panel {
                     Rectangle {
                         width: (parent.width - Style.space(24)) / 4
                         height: Style.space(52)
-                        radius: Style.radius(6)
-                        color: Qt.rgba(Theme.Color.surface.r, Theme.Color.surface.g, Theme.Color.surface.b, 0.45)
+                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.07)
                         border.width: 1
-                        border.color: Theme.Color.popups.border
+                        border.color: Color.popups.border
 
                         Column {
                             anchors.centerIn: parent
                             spacing: Style.space(2)
                             Text {
                                 text: "👁 Views"
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 opacity: 0.65
                                 font.pixelSize: Style.font.caption
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: String(root.totalViews)
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 font.pixelSize: Style.font.title
                                 font.bold: true
                                 anchors.horizontalCenter: parent.horizontalCenter
@@ -225,24 +249,24 @@ Ui.Panel {
                     Rectangle {
                         width: (parent.width - Style.space(24)) / 4
                         height: Style.space(52)
-                        radius: Style.radius(6)
-                        color: Qt.rgba(Theme.Color.surface.r, Theme.Color.surface.g, Theme.Color.surface.b, 0.45)
+                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.07)
                         border.width: 1
-                        border.color: Theme.Color.popups.border
+                        border.color: Color.popups.border
 
                         Column {
                             anchors.centerIn: parent
                             spacing: Style.space(2)
                             Text {
                                 text: "📥 Downloads"
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 opacity: 0.65
                                 font.pixelSize: Style.font.caption
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: String(root.totalDownloads)
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 font.pixelSize: Style.font.title
                                 font.bold: true
                                 anchors.horizontalCenter: parent.horizontalCenter
@@ -254,24 +278,24 @@ Ui.Panel {
                     Rectangle {
                         width: (parent.width - Style.space(24)) / 4
                         height: Style.space(52)
-                        radius: Style.radius(6)
-                        color: Qt.rgba(Theme.Color.surface.r, Theme.Color.surface.g, Theme.Color.surface.b, 0.45)
+                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.07)
                         border.width: 1
-                        border.color: Theme.Color.popups.border
+                        border.color: Color.popups.border
 
                         Column {
                             anchors.centerIn: parent
                             spacing: Style.space(2)
                             Text {
                                 text: "❤️ Hearts"
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 opacity: 0.65
                                 font.pixelSize: Style.font.caption
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: String(root.totalHearts)
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 font.pixelSize: Style.font.title
                                 font.bold: true
                                 anchors.horizontalCenter: parent.horizontalCenter
@@ -283,24 +307,24 @@ Ui.Panel {
                     Rectangle {
                         width: (parent.width - Style.space(24)) / 4
                         height: Style.space(52)
-                        radius: Style.radius(6)
-                        color: Qt.rgba(Theme.Color.surface.r, Theme.Color.surface.g, Theme.Color.surface.b, 0.45)
+                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.07)
                         border.width: 1
-                        border.color: Theme.Color.popups.border
+                        border.color: Color.popups.border
 
                         Column {
                             anchors.centerIn: parent
                             spacing: Style.space(2)
                             Text {
                                 text: "⭐ GH Stars"
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 opacity: 0.65
                                 font.pixelSize: Style.font.caption
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: String(root.totalStars)
-                                color: Theme.Color.foreground
+                                color: Color.foreground
                                 font.pixelSize: Style.font.title
                                 font.bold: true
                                 anchors.horizontalCenter: parent.horizontalCenter
@@ -313,53 +337,155 @@ Ui.Panel {
                 Rectangle {
                     width: parent.width
                     height: Style.space(42)
-                    radius: Style.radius(6)
-                    color: Qt.rgba(Theme.Color.surface.r, Theme.Color.surface.g, Theme.Color.surface.b, 0.3)
+                    radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
                     border.width: 1
-                    border.color: Theme.Color.popups.border
+                    border.color: Color.popups.border
 
-                    Row {
+                    Item {
                         anchors.fill: parent
                         anchors.margins: Style.space(6)
-                        spacing: Style.space(6)
+
+                        Row {
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Style.space(6)
+
+                            Text {
+                                text: "Interval:"
+                                color: Color.foreground
+                                opacity: 0.8
+                                font.pixelSize: Style.font.caption
+                            }
+
+                            Repeater {
+                                model: [1, 2, 5, 10, 15, 30, 60]
+                                delegate: Ui.Button {
+                                    implicitHeight: Style.space(24)
+                                    implicitWidth: Style.space(32)
+                                    text: modelData + "m"
+                                    fontSize: Style.font.caption
+                                    bordered: true
+                                    focusable: true
+                                    selected: root.intervalMinutes === modelData
+                                    onClicked: root.intervalSelected(modelData)
+                                }
+                            }
+                        }
 
                         Text {
-                            text: "Interval:"
-                            color: Theme.Color.foreground
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Updated: " + root.formatTime(root.lastUpdatedText)
+                            color: Color.foreground
+                            opacity: 0.55
+                            font.pixelSize: Style.font.caption
+                        }
+                    }
+                }
+
+                // Sort Configuration Strip
+                Rectangle {
+                    width: parent.width
+                    height: sortRow.implicitHeight + Style.space(16)
+                    radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                    border.width: 1
+                    border.color: Color.popups.border
+
+                    Row {
+                        id: sortRow
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: Style.space(10)
+                        anchors.rightMargin: Style.space(10)
+                        spacing: Style.space(10)
+
+                        Text {
+                            text: "Sort:"
+                            color: Color.foreground
                             opacity: 0.8
                             font.pixelSize: Style.font.caption
                             anchors.verticalCenter: parent.verticalCenter
                         }
 
-                        Repeater {
-                            model: [1, 2, 5, 10, 15, 30, 60]
-                            delegate: Ui.Button {
-                                implicitHeight: Style.space(24)
-                                implicitWidth: Style.space(32)
-                                text: modelData + "m"
-                                fontSize: Style.font.caption
-                                bordered: true
-                                focusable: true
-                                selected: root.intervalMinutes === modelData
-                                onClicked: root.intervalSelected(modelData)
-                            }
+                        Ui.Dropdown {
+                            id: sortByDropdown
+                            showLabel: false
+                            width: Style.space(150)
+                            value: root.sortBy
+                            options: [
+                                { value: "views", label: "👁 Views" },
+                                { value: "downloads", label: "📥 Downloads" },
+                                { value: "hearts", label: "❤️ Hearts" },
+                                { value: "stars", label: "⭐ GitHub Stars" },
+                                { value: "name", label: "🔤 Name" },
+                                { value: "date", label: "📅 Publish Date" }
+                            ]
+                            onChanged: function(v) { root.sortChanged(v, root.sortOrder) }
                         }
 
-                        Item { width: 1; Layout.fillWidth: true }
-
-                        Text {
-                            text: "Updated: " + root.formatTime(root.lastUpdatedText)
-                            color: Theme.Color.foreground
-                            opacity: 0.55
-                            font.pixelSize: Style.font.caption
-                            anchors.verticalCenter: parent.verticalCenter
+                        Ui.Dropdown {
+                            id: sortOrderDropdown
+                            showLabel: false
+                            width: Style.space(120)
+                            value: root.sortOrder
+                            options: [
+                                { value: "desc", label: "↓ Descending" },
+                                { value: "asc", label: "↑ Ascending" }
+                            ]
+                            onChanged: function(v) { root.sortChanged(root.sortBy, v) }
                         }
                     }
                 }
 
                 // Section Divider
                 Ui.PanelSectionHeader {
-                    title: "Published Plugins (" + root.plugins.length + ")"
+                    text: "Published Plugins by @" + root.author + " (" + root.plugins.length + ")"
+                }
+
+                // Table Column Headers
+                Item {
+                    width: parent.width
+                    height: Style.space(18)
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: Style.space(10)
+                        anchors.rightMargin: Style.space(10)
+                        spacing: Style.space(8)
+
+                        Text {
+                            width: Style.space(92)
+                            text: "PUBLISHED"
+                            color: Color.foreground
+                            opacity: 0.5
+                            font.family: Style.font.family
+                            font.pixelSize: Style.font.caption - 1
+                            font.bold: true
+                        }
+
+                        Text {
+                            width: Style.space(150)
+                            text: "PLUGIN"
+                            color: Color.foreground
+                            opacity: 0.5
+                            font.family: Style.font.family
+                            font.pixelSize: Style.font.caption - 1
+                            font.bold: true
+                        }
+
+                        Text {
+                            text: "STATUS / VERIFICATION"
+                            color: Color.foreground
+                            opacity: 0.5
+                            font.family: Style.font.family
+                            font.pixelSize: Style.font.caption - 1
+                            font.bold: true
+                        }
+                    }
                 }
 
                 // Plugins List Repeater
@@ -368,10 +494,10 @@ Ui.Panel {
                     delegate: Rectangle {
                         width: parent.width
                         height: cardColumn.implicitHeight + Style.space(16)
-                        radius: Style.radius(6)
-                        color: Qt.rgba(Theme.Color.surface.r, Theme.Color.surface.g, Theme.Color.surface.b, 0.4)
+                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
                         border.width: 1
-                        border.color: modelData.has_changes ? Theme.Color.accent : Theme.Color.popups.border
+                        border.color: modelData.has_changes ? Color.accent : Color.popups.border
 
                         Column {
                             id: cardColumn
@@ -380,82 +506,122 @@ Ui.Panel {
                             spacing: Style.space(8)
 
                             // Plugin Title + Status Row
-                            Row {
+                            Item {
                                 width: parent.width
-                                spacing: Style.space(8)
+                                height: Style.space(22)
 
-                                Text {
-                                    text: {
-                                        var ic = modelData.display_icon
-                                        if (ic === "rocket") return "🚀"
-                                        if (ic === "tile") return "🪟"
-                                        if (ic === "video") return "🌐"
-                                        if (ic === "reader") return "📖"
-                                        if (ic === "recipes") return "👨‍🍳"
-                                        return "📦"
-                                    }
-                                    font.pixelSize: Style.font.body
+                                Row {
+                                    anchors.left: parent.left
                                     anchors.verticalCenter: parent.verticalCenter
-                                }
+                                    spacing: Style.space(8)
 
-                                Text {
-                                    text: modelData.name
-                                    color: Theme.Color.foreground
-                                    font.family: Theme.Style.font.family
-                                    font.pixelSize: Theme.Style.font.body
-                                    font.bold: true
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
+                                    // First Column: Publish Date Badge
+                                    Rectangle {
+                                        width: Style.space(92)
+                                        height: Style.space(22)
+                                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 4)
+                                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                                        border.width: 1
+                                        border.color: Color.popups.border
 
-                                Item { width: 4; height: 1 }
-
-                                // Status Pill
-                                Rectangle {
-                                    height: Style.space(20)
-                                    width: statusText.implicitWidth + Style.space(12)
-                                    radius: Style.radius(10)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    color: {
-                                        var sc = modelData.status_code
-                                        if (sc === "verified" || sc === "published" || sc === "listed") return Qt.rgba(0.2, 0.8, 0.4, 0.15)
-                                        if (sc === "needs_fixes") return Qt.rgba(0.9, 0.3, 0.2, 0.15)
-                                        if (sc === "review") return Qt.rgba(0.95, 0.6, 0.1, 0.15)
-                                        return Qt.rgba(0.2, 0.5, 0.9, 0.15)
-                                    }
-                                    border.width: 1
-                                    border.color: {
-                                        var sc = modelData.status_code
-                                        if (sc === "verified" || sc === "published" || sc === "listed") return "#2da44e"
-                                        if (sc === "needs_fixes") return "#d1242f"
-                                        if (sc === "review") return "#fbca04"
-                                        return "#1d76db"
+                                        Row {
+                                            anchors.centerIn: parent
+                                            spacing: Style.space(4)
+                                            Text {
+                                                text: "📅"
+                                                font.pixelSize: Style.font.caption - 2
+                                            }
+                                            Text {
+                                                text: modelData.publish_date || "—"
+                                                color: Color.foreground
+                                                font.family: Style.font.family
+                                                font.pixelSize: Style.font.caption
+                                                font.bold: true
+                                            }
+                                        }
                                     }
 
-                                    Text {
-                                        id: statusText
-                                        anchors.centerIn: parent
-                                        text: modelData.status_text
-                                        font.pixelSize: Style.font.caption - 1
-                                        font.bold: true
+                                    // Second Column: Plugin Icon & Name
+                                    Item {
+                                        width: Style.space(150)
+                                        height: parent.height
+
+                                        Row {
+                                            anchors.left: parent.left
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: Style.space(6)
+
+                                            Text {
+                                                text: {
+                                                    var ic = modelData.display_icon
+                                                    if (ic === "rocket") return "🚀"
+                                                    if (ic === "tile") return "🪟"
+                                                    if (ic === "video") return "🌐"
+                                                    if (ic === "reader") return "📖"
+                                                    if (ic === "recipes") return "👨‍🍳"
+                                                    return "📦"
+                                                }
+                                                font.pixelSize: Style.font.body
+                                            }
+
+                                            Text {
+                                                text: modelData.name
+                                                color: Color.foreground
+                                                font.family: Style.font.family
+                                                font.pixelSize: Style.font.body
+                                                font.bold: true
+                                                elide: Text.ElideRight
+                                                width: Style.space(120)
+                                            }
+                                        }
+                                    }
+
+                                    // Third Column: Status Pill
+                                    Rectangle {
+                                        height: Style.space(20)
+                                        width: statusText.implicitWidth + Style.space(12)
+                                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 10)
                                         color: {
                                             var sc = modelData.status_code
-                                            if (sc === "verified" || sc === "published" || sc === "listed") return "#3fb950"
-                                            if (sc === "needs_fixes") return "#f85149"
-                                            if (sc === "review") return "#d29922"
-                                            return "#58a6ff"
+                                            if (sc === "verified" || sc === "published" || sc === "listed") return Qt.rgba(0.2, 0.8, 0.4, 0.15)
+                                            if (sc === "needs_fixes") return Qt.rgba(0.9, 0.3, 0.2, 0.15)
+                                            if (sc === "review") return Qt.rgba(0.95, 0.6, 0.1, 0.15)
+                                            return Qt.rgba(0.2, 0.5, 0.9, 0.15)
+                                        }
+                                        border.width: 1
+                                        border.color: {
+                                            var sc = modelData.status_code
+                                            if (sc === "verified" || sc === "published" || sc === "listed") return "#2da44e"
+                                            if (sc === "needs_fixes") return "#d1242f"
+                                            if (sc === "review") return "#fbca04"
+                                            return "#1d76db"
+                                        }
+
+                                        Text {
+                                            id: statusText
+                                            anchors.centerIn: parent
+                                            text: modelData.status_text
+                                            font.pixelSize: Style.font.caption - 1
+                                            font.bold: true
+                                            color: {
+                                                var sc = modelData.status_code
+                                                if (sc === "verified" || sc === "published" || sc === "listed") return "#3fb950"
+                                                if (sc === "needs_fixes") return "#f85149"
+                                                if (sc === "review") return "#d29922"
+                                                return "#58a6ff"
+                                            }
                                         }
                                     }
                                 }
 
-                                Item { Layout.fillWidth: true; width: 10 }
-
                                 // Issue Number link
                                 Text {
                                     visible: modelData.issue_number !== null
-                                    text: "#" + modelData.issue_number + " ↗"
-                                    color: Theme.Color.accent
-                                    font.pixelSize: Style.font.caption
+                                    anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
+                                    text: "#" + modelData.issue_number + " ↗"
+                                    color: Color.accent
+                                    font.pixelSize: Style.font.caption
                                     MouseArea {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
@@ -467,24 +633,31 @@ Ui.Panel {
                             // Metrics Badges Row
                             Row {
                                 width: parent.width
-                                spacing: Style.space(16)
+                                spacing: Style.space(14)
+
+                                // 1st Column: Published Date
+                                Row {
+                                    spacing: Style.space(4)
+                                    Text { text: "📅 Date:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { text: modelData.publish_date || "—"; color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                }
 
                                 // Views
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "👁 Views:"; color: Theme.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: String(modelData.views); color: Theme.Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { text: "👁 Views:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { text: String(modelData.views); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                     Rectangle {
                                         visible: modelData.views_delta > 0
                                         height: Style.space(14)
                                         width: viewsDeltaText.implicitWidth + 6
                                         radius: 3
-                                        color: Qt.rgba(Theme.Color.accent.r, Theme.Color.accent.g, Theme.Color.accent.b, 0.25)
+                                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
                                         Text {
                                             id: viewsDeltaText
                                             anchors.centerIn: parent
                                             text: "+" + modelData.views_delta
-                                            color: Theme.Color.accent
+                                            color: Color.accent
                                             font.pixelSize: Style.font.caption - 2
                                             font.bold: true
                                         }
@@ -494,19 +667,19 @@ Ui.Panel {
                                 // Downloads
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "📥 Copies:"; color: Theme.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: String(modelData.downloads); color: Theme.Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { text: "📥 Copies:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { text: String(modelData.downloads); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                     Rectangle {
                                         visible: modelData.downloads_delta > 0
                                         height: Style.space(14)
                                         width: dlDeltaText.implicitWidth + 6
                                         radius: 3
-                                        color: Qt.rgba(Theme.Color.accent.r, Theme.Color.accent.g, Theme.Color.accent.b, 0.25)
+                                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
                                         Text {
                                             id: dlDeltaText
                                             anchors.centerIn: parent
                                             text: "+" + modelData.downloads_delta
-                                            color: Theme.Color.accent
+                                            color: Color.accent
                                             font.pixelSize: Style.font.caption - 2
                                             font.bold: true
                                         }
@@ -516,15 +689,15 @@ Ui.Panel {
                                 // Hearts
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "❤️ Hearts:"; color: Theme.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: String(modelData.hearts); color: Theme.Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { text: "❤️ Hearts:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { text: String(modelData.hearts); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                 }
 
                                 // Stars
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "⭐ GH Stars:"; color: Theme.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: String(modelData.stars); color: Theme.Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { text: "⭐ GH Stars:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { text: String(modelData.stars); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                 }
                             }
 

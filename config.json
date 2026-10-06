@@ -1,0 +1,40 @@
+{
+  "interval_minutes": 5,
+  "plugins": [
+    {
+      "name": "Simple Launcher",
+      "id": "ubruckhaus.simple-launcher-for-fools",
+      "repo_name": "omarchy-simple-launcher-for-fools",
+      "display_icon": "rocket",
+      "publish_date": "2026-09-27"
+    },
+    {
+      "name": "Simple Tile",
+      "id": "ubruckhaus.simple-tile",
+      "repo_name": "omarchy-simple-tile",
+      "display_icon": "tile",
+      "publish_date": "2026-09-28"
+    },
+    {
+      "name": "Video Trans",
+      "id": "ubruckhaus.video-trans",
+      "repo_name": "omarchy-video-trans",
+      "display_icon": "video",
+      "publish_date": "2026-10-01"
+    },
+    {
+      "name": "Simple Reader",
+      "id": "ubruckhaus.simple-reader",
+      "repo_name": "omarchy-simple-reader",
+      "display_icon": "reader",
+      "publish_date": "2026-10-01"
+    },
+    {
+      "name": "Simple Recipes",
+      "id": "ubruckhaus.simple-recipes",
+      "repo_name": "omarchy-simple-recipes",
+      "display_icon": "recipes",
+      "publish_date": "2026-10-03"
+    }
+  ]
+}
