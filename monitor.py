@@ -28,14 +28,14 @@ DEFAULT_SORT_ORDER = "desc"
 
 DEFAULT_PLUGINS = [
     {
-        "name": "Simple Launcher",
+        "name": "Launch & Bind",
         "id": "ubruckhaus.simple-launcher-for-fools",
         "repo_name": "omarchy-simple-launcher-for-fools",
         "display_icon": "rocket",
         "publish_date": "2026-09-27"
     },
     {
-        "name": "Simple Tile",
+        "name": "Workspace Presets",
         "id": "ubruckhaus.simple-tile",
         "repo_name": "omarchy-simple-tile",
         "display_icon": "tile",
@@ -321,6 +321,9 @@ def discover_plugins_by_author(author=DEFAULT_AUTHOR, repos=None, issues=None, s
                                     "version": mf_version
                                 }
                             else:
+                                # The installed manifest is authoritative for display names (renames)
+                                if name:
+                                    discovered[pid]["name"] = name
                                 if not discovered[pid].get("description"):
                                     discovered[pid]["description"] = m.get("description", "")
                                 if not discovered[pid].get("version"):
@@ -373,9 +376,26 @@ def discover_plugins_by_author(author=DEFAULT_AUTHOR, repos=None, issues=None, s
                     "display_icon": "plugin"
                 }
 
-    result = list(discovered.values())
+    # Only list published plugins: known defaults, marketplace stats, or a marketplace issue.
+    # Local-only plugins (installed but never submitted) are skipped.
+    default_ids = {p["id"] for p in DEFAULT_PLUGINS}
+    stats_ids = set(stats.keys()) if stats else set()
+    result = [
+        p for p in discovered.values()
+        if p["id"] in default_ids or p["id"] in stats_ids or has_marketplace_issue(p, issues or [])
+    ]
     result.sort(key=lambda x: x.get("publish_date") or "9999")
     return result
+
+def has_marketplace_issue(plugin_dict, issues):
+    pname_lower = plugin_dict.get("name", "").lower()
+    pid = plugin_dict.get("id", "")
+    clean_id = pid.split(".")[-1].lower() if "." in pid else pid.lower()
+    for i in issues:
+        title_lower = i.get("title", "").lower()
+        if (pname_lower and pname_lower in title_lower) or (clean_id and clean_id in title_lower):
+            return True
+    return False
 
 def determine_publish_date(plugin_dict, issues):
     if plugin_dict.get("publish_date"):

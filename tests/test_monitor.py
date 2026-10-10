@@ -204,6 +204,19 @@ class TestMonitor(unittest.TestCase):
         self.assertIn("someone.awesome-bar", custom_ids)
         self.assertNotIn("someone.my-plugins", custom_ids)
 
+    def test_discover_skips_unpublished_local_plugins(self):
+        from unittest import mock
+        home = Path(self.tmp_dir.name) / "home"
+        for pid, name in (("ubruckhaus.pellet-stove", "Pellet Stove"), ("ubruckhaus.theme-manager", "Theme Manager")):
+            d = home / ".config" / "omarchy" / "plugins" / pid
+            d.mkdir(parents=True)
+            (d / "manifest.json").write_text(json.dumps({"id": pid, "name": name, "author": "uBruckhaus"}))
+        issues = [{"title": "[Plugin]: Theme Manager", "number": 1, "state": "CLOSED", "labels": []}]
+        with mock.patch.object(Path, "home", return_value=home):
+            ids = [p["id"] for p in monitor.discover_plugins_by_author(author="ubruckhaus", issues=issues, stats={})]
+        self.assertIn("ubruckhaus.theme-manager", ids)
+        self.assertNotIn("ubruckhaus.pellet-stove", ids)
+
     def test_sort_plugins(self):
         plugins = [
             {"id": "a.x", "name": "Alpha", "views": 5, "downloads": 100, "hearts": 1, "stars": 0, "publish_date": "2026-01-02"},

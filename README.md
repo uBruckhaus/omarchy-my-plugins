@@ -28,13 +28,15 @@ A native Omarchy desktop shell bar widget and panel that monitors your published
   - Each with **Ascending** or **Descending** order.
   - Default: **Views, Descending**.
   - Adjust anytime directly from the panel dropdowns or CLI.
+- **🚫 Published Only**:
+  - Only plugins with marketplace stats or a `[Plugin]`/`[Verify]` marketplace issue are listed; locally installed, unpublished plugins (e.g. Pellet Stove) are hidden.
 - **📦 Version Display**:
   - Each plugin card shows its current version from the installed manifest.
   - When the latest GitHub release differs, it is shown alongside (e.g. `v0.3.0 · GH v0.3.3`) so installed-vs-published drift is visible at a glance.
 - **🎯 One-Click Deep Links**:
   - Jump directly to the plugin's Marketplace detail page (`https://plugins.omarchy.org/plugin.html?id=<plugin-id>`).
   - Open the GitHub repository.
-  - Track review/submission progress directly in GitHub Marketplace verification issues (e.g. #9889 for Simple Recipes, #9826 for Simple Tile).
+  - Track review/submission progress directly in GitHub Marketplace verification issues (e.g. #9889 for Simple Recipes, #9826 for Workspace Presets).
 - **🔒 Omarchy Security Baseline**:
   - Non-truncating lock file acquisition (`os.O_NOFOLLOW | os.O_CREAT | os.O_RDWR`, mode `0600`).
   - Secure `$XDG_RUNTIME_DIR` ownership and permissions verification.
@@ -47,8 +49,8 @@ A native Omarchy desktop shell bar widget and panel that monitors your published
 
 | Plugin | ID | Default Category | Repository | Initial Publication State |
 | :--- | :--- | :--- | :--- | :--- |
-| **Simple Launcher** | `ubruckhaus.simple-launcher-for-fools` | Desktop | `uBruckhaus/omarchy-simple-launcher-for-fools` | Listed & Verified (Issue #8539) |
-| **Simple Tile** | `ubruckhaus.simple-tile` | Desktop | `uBruckhaus/omarchy-simple-tile` | Listed & Verified (Issue #9826) |
+| **Launch & Bind** | `ubruckhaus.simple-launcher-for-fools` | Desktop | `uBruckhaus/omarchy-simple-launcher-for-fools` | Listed & Verified (Issue #8539) |
+| **Workspace Presets** | `ubruckhaus.simple-tile` | Desktop | `uBruckhaus/omarchy-simple-tile` | Listed & Verified (Issue #9826) |
 | **Video Trans** | `ubruckhaus.video-trans` | Media | `uBruckhaus/omarchy-video-trans` | Listed & Verified (Issue #9467) |
 | **Simple Reader** | `ubruckhaus.simple-reader` | Accessibility | `uBruckhaus/omarchy-simple-reader` | Listed & Verified (Issue #9489) |
 | **Simple Recipes** | `ubruckhaus.simple-recipes` | Productivity | `uBruckhaus/omarchy-simple-recipes` | Review: Needs Fixes (Issue #9889) |

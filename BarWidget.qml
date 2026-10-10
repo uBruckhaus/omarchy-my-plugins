@@ -111,6 +111,11 @@ ShellUi.BarWidget {
         request({command: "open_url", url: url})
     }
 
+    // PopupCard (outside click) and the bar's popout coordinator call these
+    // on the owner (this widget); without them panel.opened gets stuck true.
+    function close() { panel.close() }
+    function closeForPopoutSwitch() { panel.closeForPopoutSwitch() }
+
     function togglePanel() {
         if (panel.opened) {
             panel.close()

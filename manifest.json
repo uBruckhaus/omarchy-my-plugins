@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "ubruckhaus.my-plugins",
   "name": "My Plugins",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "uBruckhaus",
   "license": "MIT",
   "description": "Monitor Omarchy marketplace publication, views, downloads, and stars with live bar icon change indicators.",
