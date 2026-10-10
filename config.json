@@ -2,14 +2,14 @@
   "interval_minutes": 5,
   "plugins": [
     {
-      "name": "Simple Launcher",
+      "name": "Launch & Bind",
       "id": "ubruckhaus.simple-launcher-for-fools",
       "repo_name": "omarchy-simple-launcher-for-fools",
       "display_icon": "rocket",
       "publish_date": "2026-09-27"
     },
     {
-      "name": "Simple Tile",
+      "name": "Workspace Presets",
       "id": "ubruckhaus.simple-tile",
       "repo_name": "omarchy-simple-tile",
       "display_icon": "tile",
@@ -36,5 +36,8 @@
       "display_icon": "recipes",
       "publish_date": "2026-10-03"
     }
-  ]
+  ],
+  "author": "ubruckhaus",
+  "sort_by": "views",
+  "sort_order": "desc"
 }
