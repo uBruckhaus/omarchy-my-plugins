@@ -80,6 +80,10 @@ ShellUi.BarWidget {
                 root.accountMessage = data.message || "Request failed"
                 return
             }
+            if (currentRequest && currentRequest.command === "paste") {
+                if (data.clipboard) panel.pasteIntoAccount(data.clipboard)
+                return
+            }
             if (data.status === "ok" && data.labels !== undefined) {
                 root.history = data
                 return
@@ -226,6 +230,8 @@ ShellUi.BarWidget {
         onOpenUrl: function(url) { root.openExternalUrl(url) }
         onAccountSubmitted: function(name) { root.setAccount(name) }
         onHistoryRequested: function(plugin, metric, range) { root.requestHistory(plugin, metric, range) }
+        onPasteRequested: root.request({command: "paste"})
+        onClearHistoryRequested: function(plugin, metric, range) { root.request({command: "clear_history", plugin: plugin, metric: metric, range: range}) }
     }
 
     // Bar button

@@ -155,6 +155,15 @@ class HistoryTests(Isolated):
         self.assertEqual(monthly["labels"][-2:], ["Sep", "Oct"])
         self.assertEqual(monthly["values"][-2:], [0, 50])
 
+    def test_clear_history(self):
+        self.record(date(2026, 10, 10), 5)
+        result = monitor.handle_request({"command": "clear_history", "plugin": "p.a", "metric": "views", "range": "daily"})
+        self.assertEqual(result["status"], "ok")
+        self.assertIsNone(result["first_day"])
+        self.assertTrue(all(v is None for v in result["values"]))
+        self.assertFalse((monitor.get_state_dir() / "history.json").exists())
+        self.assertEqual(monitor.clear_history()["status"], "ok")   # nothing left to delete is fine
+
     def test_bad_requests_and_pruning(self):
         self.assertEqual(monitor.history_series("p.a", "rm -rf", "daily")["status"], "error")
         self.assertEqual(monitor.history_series("p.a", "views", "yearly")["status"], "error")
@@ -259,3 +268,28 @@ class SafeguardTests(unittest.TestCase):
         self.addCleanup(server.shutdown)
         with self.assertRaises(Exception):
             monitor.http_get(f"http://127.0.0.1:{server.server_address[1]}/", 1024, timeout=3)
+
+
+class ClipboardTests(unittest.TestCase):
+    def test_paste_is_bounded_and_plain(self):
+        calls = []
+        def fake(args, limit, timeout):
+            calls.append((args, limit, timeout))
+            if "--list-types" in args:
+                return 0, "text/plain\nimage/png\n"
+            return 0, "uBruck\x1bhaus\n"
+        with patch("monitor.run_bounded", side_effect=fake):
+            self.assertEqual(monitor.handle_request({"command": "paste"}), {"status": "ok", "clipboard": "uBruckhaus"})
+        self.assertTrue(all(limit <= 4096 and timeout <= 2 for _args, limit, timeout in calls))
+        with patch("monitor.run_bounded", side_effect=ValueError("too large")):
+            self.assertEqual(monitor.read_clipboard()["status"], "error")
+        with patch("monitor.run_bounded", return_value=(0, "image/png\n")):
+            self.assertEqual(monitor.read_clipboard()["clipboard"], "")
+
+    def test_no_qt_text_inputs_in_the_shell_ui(self):
+        import re
+        root = Path(__file__).resolve().parent.parent
+        for qml in list(root.glob("*.qml")) + list((root / "native").rglob("*.qml")):
+            code = re.sub(r"//[^\n]*", "", qml.read_text())
+            for pattern in (r"\bTextInput\s*\{", r"\bTextEdit\s*\{", r"\bTextArea\s*\{", r"QQC\.TextField", r"editable:\s*true"):
+                self.assertIsNone(re.search(pattern, code), f"{qml.name}: {pattern}")

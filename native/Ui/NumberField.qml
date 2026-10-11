@@ -41,7 +41,10 @@ Column {
     to: root.to
     stepSize: root.stepSize
     value: root.value
-    editable: true
+    // Not editable: a text input would watch the Wayland clipboard (unbounded reads).
+    // The value changes with the +/- buttons, arrow keys and the scroll wheel.
+    editable: false
+    wheelEnabled: true
     font.family: root.fontFamily
     font.pixelSize: root.fontSize
 
@@ -69,17 +72,13 @@ Column {
       }
     }
 
-    contentItem: TextInput {
+    contentItem: Text {
       text: spin.displayText
+      textFormat: Text.PlainText
       font: spin.font
       color: root.foreground
-      selectionColor: Style.selectionFillFor(root.foreground, root.accent)
-      selectedTextColor: root.foreground
       horizontalAlignment: Qt.AlignHCenter
       verticalAlignment: Qt.AlignVCenter
-      readOnly: !spin.editable
-      validator: spin.validator
-      inputMethodHints: Qt.ImhFormattedNumbersOnly
     }
   }
 }

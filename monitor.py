@@ -683,6 +683,32 @@ def record_history(plugins_map, state_dir=None, today=None):
         save_json_file(path, {"schema": 1, "days": days})
 
 
+PASTE_TYPES = ("text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "TEXT", "STRING")
+
+
+def read_clipboard():
+    """Explicit paste (Ctrl+V in the account field): plain text, at most 4 KiB within 2 s.
+    The popup's text fields never read the clipboard by themselves."""
+    try:
+        code, offered = run_bounded(["wl-paste", "--list-types"], limit=4096, timeout=1)
+        mime = next((t for t in PASTE_TYPES if t in offered.split()), None) if code == 0 else None
+        if not mime:
+            return {"status": "ok", "clipboard": ""}
+        code, text = run_bounded(["wl-paste", "--no-newline", "--type", mime], limit=4096, timeout=2)
+    except (OSError, ValueError, TimeoutError):
+        return {"status": "error", "message": "Clipboard text is too long or did not answer in time."}
+    text = text if code == 0 else ""
+    return {"status": "ok", "clipboard": "".join(c for c in text if c >= " " and c != "\x7f")}
+
+
+def clear_history(state_dir=None):
+    """Delete all recorded daily snapshots (asked for with confirmation in the popup)."""
+    path = (state_dir or get_state_dir()) / "history.json"
+    with runtime_lock("my_plugins_history.lock"):
+        path.unlink(missing_ok=True)
+    return {"status": "ok"}
+
+
 def history_series(plugin="all", metric="views", period="daily", state_dir=None, today=None):
     """Gains per day, ISO week or month for one plugin or all, from the daily snapshots.
 
@@ -909,6 +935,11 @@ def handle_request(req):
         if res.get("status") != "ok":
             return res
         return query_metrics(author=res["author"] or None)
+    elif cmd == "paste":
+        return read_clipboard()
+    elif cmd == "clear_history":
+        clear_history()
+        return history_series(str(req.get("plugin", "all")), str(req.get("metric", "views")), str(req.get("range", "daily")))
     elif cmd == "history":
         return history_series(str(req.get("plugin", "all")), str(req.get("metric", "views")), str(req.get("range", "daily")))
     elif cmd == "open_url":

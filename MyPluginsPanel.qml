@@ -18,6 +18,7 @@ Ui.Panel {
     property string accountSource: ""
     property bool editAccount: false
     property bool showHistory: false
+    property bool confirmClearHistory: false
     property var history: ({})
     property string historyMetric: "views"
     property string historyRange: "daily"
@@ -46,10 +47,13 @@ Ui.Panel {
     signal openUrl(string url)
     signal accountSubmitted(string name)
     signal historyRequested(string plugin, string metric, string range)
+    signal clearHistoryRequested(string plugin, string metric, string range)
+    signal pasteRequested()
+    function pasteIntoAccount(text) { accountField.insert(text) }
 
     function reloadHistory() { historyRequested(historyPlugin, historyMetric, historyRange) }
     onOpenedChanged: if (opened) reloadHistory(); else showHistory = false
-    onShowHistoryChanged: { panelScroll.contentY = 0; if (showHistory) reloadHistory() }
+    onShowHistoryChanged: { panelScroll.contentY = 0; confirmClearHistory = false; if (showHistory) reloadHistory() }
 
     function formatTime(isoString) {
         if (!isoString) return "Never"
@@ -433,7 +437,7 @@ Ui.Panel {
                             Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Plugins are found in the marketplace catalog by repository owner: for github.com/uBruckhaus/omarchy-theme-manager the account is uBruckhaus. Leave it empty to use the account detected on this computer (gh login, git settings or your installed plugins)."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
                             Row {
                                 width: parent.width; spacing: Style.space(6)
-                                Ui.TextField { id: accountField; width: parent.width - saveAccount.width - Style.space(6); text: root.author; placeholderText: "GitHub account, e.g. uBruckhaus"; onAccepted: root.accountSubmitted(text.trim()) }
+                                Ui.TextField { id: accountField; pasteHandler: function(field) { root.pasteRequested() }; width: parent.width - saveAccount.width - Style.space(6); text: root.author; placeholderText: "GitHub account, e.g. uBruckhaus"; onAccepted: root.accountSubmitted(text.trim()) }
                                 Ui.Button { id: saveAccount; focusable: true; bordered: true; text: "Save"; onClicked: { root.accountSubmitted(accountField.text.trim()); root.editAccount = false } }
                             }
                             Text { width: parent.width; visible: root.author !== "" && root.accountSource !== "" && root.accountSource !== "settings"; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Using @" + root.author + ", detected from " + root.accountSource + " on this computer. Save to keep it, or enter another account."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
@@ -886,6 +890,29 @@ Ui.Panel {
                             Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1
                                    text: root.history.first_day ? "Gains per " + (root.historyRange === "daily" ? "day" : root.historyRange === "weekly" ? "week" : "month") + ". Recorded since " + root.history.first_day + "; the marketplace keeps no history, so earlier periods stay empty."
                                                                 : "History starts with the first refresh: one snapshot per day is kept for 400 days." }
+                        }
+                    }
+                    // Clear history, with an in-place confirmation
+                    Ui.Button { focusable: true; visible: !root.confirmClearHistory; bordered: true; text: "🗑  Clear history…"; onClicked: root.confirmClearHistory = true }
+                    Rectangle {
+                        width: parent.width
+                        visible: root.confirmClearHistory
+                        height: visible ? confirmColumn.implicitHeight + Style.space(16) : 0
+                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.10)
+                        border.width: 1
+                        border.color: Color.accent
+                        Column {
+                            id: confirmColumn
+                            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
+                            spacing: Style.space(6)
+                            Text { textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap; color: Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption
+                                   text: "Delete all recorded history" + (root.history.first_day ? " (since " + root.history.first_day + ")" : "") + " for all plugins? This cannot be undone. Recording starts again with the next refresh." }
+                            Row {
+                                spacing: Style.space(6)
+                                Ui.Button { focusable: true; bordered: true; text: "Delete history"; onClicked: { root.confirmClearHistory = false; root.clearHistoryRequested(root.historyPlugin, root.historyMetric, root.historyRange) } }
+                                Ui.Button { focusable: true; bordered: true; text: "Cancel"; onClicked: root.confirmClearHistory = false }
+                            }
                         }
                     }
                     Ui.Button { focusable: true; width: parent.width; bordered: true; text: "← Back to My Plugins · ⌫"; onClicked: root.showHistory = false }
