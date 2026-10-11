@@ -418,7 +418,7 @@ Ui.Panel {
                         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
                         spacing: Style.space(6)
                         Text { textFormat: Text.PlainText; width: parent.width; text: "GitHub account"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
-                        Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Plugins are found in the marketplace catalog by repository owner: for github.com/uBruckhaus/omarchy-theme-manager the account is uBruckhaus. Leave it empty to use the account gh is logged into."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                        Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Plugins are found in the marketplace catalog by repository owner: for github.com/uBruckhaus/omarchy-theme-manager the account is uBruckhaus. Leave it empty to use the account detected on this computer (gh login, git settings or your installed plugins)."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
                         Row {
                             width: parent.width; spacing: Style.space(6)
                             Ui.TextField { id: accountField; width: parent.width - saveAccount.width - Style.space(6); text: root.author; placeholderText: "GitHub account, e.g. uBruckhaus"; onAccepted: root.accountSubmitted(text.trim()) }
