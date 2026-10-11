@@ -45,17 +45,25 @@ A native Omarchy desktop shell bar widget and panel that monitors your published
 
 ---
 
-## Monitored Plugins Matrix
+## Which plugins are shown
 
-| Plugin | ID | Default Category | Repository | Initial Publication State |
-| :--- | :--- | :--- | :--- | :--- |
-| **Launch & Bind** | `ubruckhaus.simple-launcher-for-fools` | Desktop | `uBruckhaus/omarchy-simple-launcher-for-fools` | Listed & Verified (Issue #8539) |
-| **Workspace Presets** | `ubruckhaus.simple-tile` | Desktop | `uBruckhaus/omarchy-simple-tile` | Listed & Verified (Issue #9826) |
-| **Video Trans** | `ubruckhaus.video-trans` | Media | `uBruckhaus/omarchy-video-trans` | Listed & Verified (Issue #9467) |
-| **Simple Reader** | `ubruckhaus.simple-reader` | Accessibility | `uBruckhaus/omarchy-simple-reader` | Listed & Verified (Issue #9489) |
-| **Simple Recipes** | `ubruckhaus.simple-recipes` | Productivity | `uBruckhaus/omarchy-simple-recipes` | Review: Needs Fixes (Issue #9889) |
+Set your **GitHub account** (click the `@account ✎` badge in the popup): the owner of your plugin
+repositories, e.g. `uBruckhaus` for `github.com/uBruckhaus/omarchy-theme-manager`. My Plugins lists
+every plugin in the marketplace catalog whose repository belongs to that account, so any plugin
+developer can use it. Leave the field empty to use the account `gh` is logged into.
 
----
+Data sources: the marketplace catalog (`site/catalog.json` of `omacom/omarchy-plugin-marketplace`,
+cached and refreshed at most hourly with ETag), the marketplace stats API (views, downloads, hearts),
+GitHub (live stars) and your marketplace issues (review status). Every download has a size cap and
+an overall deadline.
+
+## History
+
+Each refresh stores one snapshot per day (views, downloads, hearts and stars for every plugin) in
+`~/.local/state/omarchy/my-plugins/history.json`, kept for 400 days. The **History** card shows the
+gains per day (30 days), week (12 weeks) or month (12 months) for one plugin or all of them; hover a
+bar for its value and running total. The marketplace keeps no history itself, so the chart starts on
+the day My Plugins first runs.
 
 ## Bar Icon & Controls
 
@@ -82,6 +90,9 @@ python3 monitor.py --acknowledge
 
 # Change polling interval (e.g. to 10 minutes)
 python3 monitor.py --set-interval 10
+
+# Set the GitHub account whose plugins are shown (empty: use the gh login)
+python3 monitor.py --set-author uBruckhaus
 
 # Change plugin list sorting (field: views|downloads|hearts|stars|name|date, order: asc|desc)
 python3 monitor.py --set-sort views desc

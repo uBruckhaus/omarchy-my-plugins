@@ -12,7 +12,18 @@ Ui.Panel {
     property var anchorItem: null
     property var hostWidget: null
 
-    property string author: "ubruckhaus"
+    property string author: ""
+    property bool needsAccount: false
+    property string accountMessage: ""
+    property bool editAccount: false
+    property var history: ({})
+    property string historyMetric: "views"
+    property string historyRange: "daily"
+    property string historyPlugin: "all"
+    readonly property var historyValues: history.values || []
+    readonly property real historyMax: Math.max.apply(null, [1].concat(historyValues.filter(function(v) { return v !== null })))
+    readonly property int historyGain: historyValues.reduce(function(sum, v) { return sum + (v || 0) }, 0)
+    property int hoveredBar: -1
     property var plugins: []
     property int totalViews: 0
     property int totalDownloads: 0
@@ -31,6 +42,11 @@ Ui.Panel {
     signal intervalSelected(int minutes)
     signal sortChanged(string sortBy, string sortOrder)
     signal openUrl(string url)
+    signal accountSubmitted(string name)
+    signal historyRequested(string plugin, string metric, string range)
+
+    function reloadHistory() { historyRequested(historyPlugin, historyMetric, historyRange) }
+    onOpenedChanged: if (opened) reloadHistory()
 
     function formatTime(isoString) {
         if (!isoString) return "Never"
@@ -46,8 +62,10 @@ Ui.Panel {
         }
     }
 
-    Ui.PopupCard {
+    // A layer surface that takes the keyboard; the xdg-popup PopupCard never receives typing.
+    Ui.KeyboardPanel {
         id: popup
+        focusTarget: content
         bar: root.bar
         anchorItem: root.anchorItem
         owner: root.hostWidget || root
@@ -105,12 +123,13 @@ Ui.Panel {
                                     Text {
                                         id: authorBadgeText
                                         anchors.centerIn: parent
-                                        text: "@" + root.author
+                                        text: root.author ? "@" + root.author + " ✎" : "set account ✎"
                                         color: Color.accent
                                         font.family: Style.font.family
                                         font.pixelSize: Style.font.caption - 1
                                         font.bold: true
-                                    }
+                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.editAccount = !root.editAccount }
+                                }
                                 }
                             }
                             Text {
@@ -384,6 +403,103 @@ Ui.Panel {
                     }
                 }
 
+                // GitHub account whose marketplace plugins are shown
+                Rectangle {
+                    width: parent.width
+                    visible: root.editAccount || root.needsAccount
+                    height: visible ? accountColumn.implicitHeight + Style.space(16) : 0
+                    radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                    color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08)
+                    border.width: 1
+                    border.color: Color.accent
+                    Column {
+                        id: accountColumn
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
+                        spacing: Style.space(6)
+                        Text { width: parent.width; text: "GitHub account"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
+                        Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Plugins are found in the marketplace catalog by repository owner: for github.com/uBruckhaus/omarchy-theme-manager the account is uBruckhaus. Leave it empty to use the account gh is logged into."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                        Row {
+                            width: parent.width; spacing: Style.space(6)
+                            Ui.TextField { id: accountField; width: parent.width - saveAccount.width - Style.space(6); text: root.author; placeholderText: "GitHub account, e.g. uBruckhaus"; onAccepted: root.accountSubmitted(text.trim()) }
+                            Ui.Button { id: saveAccount; focusable: true; bordered: true; text: "Save"; onClicked: { root.accountSubmitted(accountField.text.trim()); root.editAccount = false } }
+                        }
+                        Text { width: parent.width; visible: root.accountMessage !== ""; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.accountMessage; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                    }
+                }
+
+                // History of views, downloads, hearts and stars
+                Rectangle {
+                    width: parent.width
+                    height: historyColumn.implicitHeight + Style.space(16)
+                    radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                    border.width: 1
+                    border.color: Color.popups.border
+                    Column {
+                        id: historyColumn
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(10)
+                        spacing: Style.space(8)
+                        Row {
+                            width: parent.width; spacing: Style.space(8)
+                            Text { text: "📈 History"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
+                            Text { anchors.verticalCenter: parent.verticalCenter; color: Color.foreground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption
+                                   text: root.hoveredBar >= 0 && root.historyValues[root.hoveredBar] !== null
+                                         ? (root.history.labels || [])[root.hoveredBar] + ": +" + root.historyValues[root.hoveredBar] + " (" + (root.history.totals || [])[root.hoveredBar] + " total)"
+                                         : "+" + root.historyGain + " in this range" }
+                        }
+                        Row {
+                            width: parent.width; spacing: Style.space(6)
+                            Ui.Dropdown { showLabel: false; width: (parent.width - Style.space(12)) / 3; value: root.historyMetric
+                                options: [{value: "views", label: "👁 Views"}, {value: "downloads", label: "📥 Downloads"}, {value: "hearts", label: "❤️ Hearts"}, {value: "stars", label: "⭐ Stars"}]
+                                onChanged: function(v) { root.historyMetric = v; root.reloadHistory() } }
+                            Ui.Dropdown { showLabel: false; width: (parent.width - Style.space(12)) / 3; value: root.historyRange
+                                options: [{value: "daily", label: "Daily · 30 days"}, {value: "weekly", label: "Weekly · 12 weeks"}, {value: "monthly", label: "Monthly · 12 months"}]
+                                onChanged: function(v) { root.historyRange = v; root.reloadHistory() } }
+                            Ui.Dropdown { showLabel: false; width: (parent.width - Style.space(12)) / 3; value: root.historyPlugin
+                                options: [{value: "all", label: "All plugins"}].concat(root.plugins.map(function(p) { return {value: p.id, label: p.name} }))
+                                onChanged: function(v) { root.historyPlugin = v; root.reloadHistory() } }
+                        }
+                        Item {
+                            id: chart
+                            width: parent.width; height: Style.space(110)
+                            readonly property int count: Math.max(1, root.historyValues.length)
+                            readonly property real slot: width / count
+                            Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1; color: Color.foreground; opacity: 0.25 }
+                            Repeater {
+                                model: root.historyValues
+                                Rectangle {
+                                    required property var modelData
+                                    required property int index
+                                    x: index * chart.slot + chart.slot * 0.15
+                                    width: Math.max(2, chart.slot * 0.7)
+                                    height: modelData === null ? 2 : Math.max(modelData > 0 ? 3 : 1, (chart.height - Style.space(14)) * modelData / root.historyMax)
+                                    anchors.bottom: parent.bottom
+                                    radius: Math.min(3, width / 2)
+                                    color: modelData === null ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                                                              : (root.hoveredBar === index ? Color.foreground : Color.accent)
+                                    Text { visible: modelData !== null && modelData > 0 && chart.count <= 12; anchors.bottom: parent.top; anchors.horizontalCenter: parent.horizontalCenter
+                                           text: modelData; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1 }
+                                    MouseArea { anchors.fill: parent; anchors.topMargin: -chart.height; hoverEnabled: true
+                                                onEntered: root.hoveredBar = index; onExited: if (root.hoveredBar === index) root.hoveredBar = -1 }
+                                }
+                            }
+                        }
+                        Item {
+                            width: parent.width; height: Style.space(14)
+                            Repeater {
+                                model: root.history.labels || []
+                                Text { required property var modelData; required property int index
+                                       visible: chart.count <= 12 || index % 5 === (chart.count - 1) % 5
+                                       x: index * chart.slot + chart.slot / 2 - width / 2
+                                       text: modelData; color: Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1 }
+                            }
+                        }
+                        Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1
+                               text: root.history.first_day ? "Gains per " + (root.historyRange === "daily" ? "day" : root.historyRange === "weekly" ? "week" : "month") + ". Recorded since " + root.history.first_day + "; the marketplace keeps no history, so earlier periods stay empty."
+                                                            : "History starts with the first refresh: one snapshot per day is kept for 400 days." }
+                    }
+                }
+
                 // Sort Configuration Strip
                 Rectangle {
                     width: parent.width
@@ -443,7 +559,7 @@ Ui.Panel {
 
                 // Section Divider
                 Ui.PanelSectionHeader {
-                    text: "Published Plugins by @" + root.author + " (" + root.plugins.length + ")"
+                    text: "Published Plugins by @" + (root.author || "?") + " (" + root.plugins.length + ")"
                 }
 
                 // Table Column Headers

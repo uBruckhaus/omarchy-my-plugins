@@ -13,7 +13,11 @@ ShellUi.BarWidget {
     property bool opened: panel.opened
     property bool popoutSwitchClosing: panel.popoutSwitchClosing
 
-    property string author: "ubruckhaus"
+    property string author: ""
+    property bool needsAccount: false
+    property string accountMessage: ""
+    property var history: ({})
+    property var historyRequest: ({plugin: "all", metric: "views", range: "daily"})
     property int intervalMinutes: Math.max(1, Number(setting("intervalMinutes", 5)) || 5)
     property var plugins: []
     property int totalViews: 0
@@ -66,6 +70,25 @@ ShellUi.BarWidget {
         isQuerying = false
         try {
             var data = JSON.parse(text)
+            if (data.needs_account) {
+                root.needsAccount = true
+                root.accountMessage = data.message || ""
+                return
+            }
+            if (data.status === "error") {
+                root.accountMessage = data.message || "Request failed"
+                return
+            }
+            if (data.status === "ok" && data.labels !== undefined) {
+                root.history = data
+                return
+            }
+            if (data.status === "ok" && data.plugins !== undefined) {
+                root.needsAccount = false
+                root.accountMessage = ""
+                // New numbers arrived: refresh the chart for the current selection.
+                if (panel.opened && currentRequest && currentRequest.command !== "history") Qt.callLater(root.requestHistory)
+            }
             if (data.status === "ok") {
                 if (data.author !== undefined) root.author = data.author
                 if (data.plugins !== undefined) root.plugins = data.plugins
@@ -105,6 +128,16 @@ ShellUi.BarWidget {
     function acknowledgeChanges() {
         root.hasChanges = false
         request({command: "acknowledge"})
+    }
+
+    function requestHistory(plugin, metric, range) {
+        if (plugin !== undefined) root.historyRequest = {plugin: plugin, metric: metric, range: range}
+        request(Object.assign({command: "history"}, root.historyRequest))
+    }
+
+    function setAccount(name) {
+        root.accountMessage = ""
+        request({command: "set_author", author: name})
     }
 
     function openExternalUrl(url) {
@@ -179,12 +212,17 @@ ShellUi.BarWidget {
         isQuerying: root.isQuerying
         sortBy: root.sortBy
         sortOrder: root.sortOrder
+        needsAccount: root.needsAccount
+        accountMessage: root.accountMessage
+        history: root.history
 
         onRefreshRequested: root.request({command: "query"})
         onAcknowledgeRequested: root.acknowledgeChanges()
         onIntervalSelected: function(m) { root.setIntervalMinutes(m) }
         onSortChanged: function(by, order) { root.setSort(by, order) }
         onOpenUrl: function(url) { root.openExternalUrl(url) }
+        onAccountSubmitted: function(name) { root.setAccount(name) }
+        onHistoryRequested: function(plugin, metric, range) { root.requestHistory(plugin, metric, range) }
     }
 
     // Bar button
@@ -195,7 +233,7 @@ ShellUi.BarWidget {
         active: root.opened || root.hasChanges
 
         tooltipText: {
-            var prefix = "My Plugins · @" + root.author + " · Marketplace Monitor\n"
+            var prefix = "My Plugins · " + (root.author ? "@" + root.author : "no account set") + " · Marketplace Monitor\n"
             if (root.hasChanges) {
                 return prefix + "⚡ New updates detected!\n" + (root.changesSummary !== "" ? root.changesSummary : "Metrics changed") + "\nClick to open · Right-click to refresh"
             }

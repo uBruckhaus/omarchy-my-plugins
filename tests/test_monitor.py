@@ -50,7 +50,8 @@ class TestMonitor(unittest.TestCase):
     def test_default_config(self):
         cfg = monitor.load_config()
         self.assertEqual(cfg["interval_minutes"], 5)
-        self.assertEqual(len(cfg["plugins"]), 5)
+        self.assertEqual(cfg["plugins"], [])
+        self.assertEqual(cfg["author"], "")  # empty: the gh login is used
 
     def test_set_interval(self):
         res = monitor.set_interval(15)
@@ -59,6 +60,27 @@ class TestMonitor(unittest.TestCase):
 
         cfg = monitor.load_config()
         self.assertEqual(cfg["interval_minutes"], 15)
+
+    def test_sort_settings_migrate_outside_watched_plugin_directory(self):
+        config_home = Path(os.environ["XDG_CONFIG_HOME"])
+        legacy_file = config_home / "omarchy" / "plugins" / "ubruckhaus.my-plugins" / "config.json"
+        legacy_file.parent.mkdir(parents=True)
+        legacy = {"author": "example", "interval_minutes": 15,
+                  "sort_by": "stars", "sort_order": "asc", "plugins": []}
+        legacy_text = json.dumps(legacy)
+        legacy_file.write_text(legacy_text)
+
+        self.assertEqual(monitor.load_config(), legacy)
+        self.assertEqual(monitor.set_sort("name", "desc")["status"], "ok")
+
+        settings_file = config_home / "omarchy" / "my-plugins" / "config.json"
+        self.assertTrue(settings_file.is_file())
+        self.assertEqual(legacy_file.read_text(), legacy_text)
+        saved = monitor.load_config()
+        self.assertEqual(saved["sort_by"], "name")
+        self.assertEqual(saved["sort_order"], "desc")
+        self.assertEqual(saved["author"], "example")
+        self.assertEqual(saved["interval_minutes"], 15)
 
     def test_status_determination(self):
         issues = [
@@ -87,32 +109,6 @@ class TestMonitor(unittest.TestCase):
         self.assertEqual(st_text, "Listed & Verified")
         self.assertEqual(st_code, "verified")
         self.assertEqual(num, 9165)
-
-    def test_publish_date_determination(self):
-        # 1. Configured explicitly
-        p_explicit = {"name": "Custom", "id": "custom", "publish_date": "2026-05-01"}
-        self.assertEqual(monitor.determine_publish_date(p_explicit, []), "2026-05-01")
-
-        # 2. Known default plugin
-        p_launcher = {"name": "Simple Launcher", "id": "ubruckhaus.simple-launcher-for-fools"}
-        self.assertEqual(monitor.determine_publish_date(p_launcher, []), "2026-09-27")
-
-        p_tile = {"name": "Simple Tile", "id": "ubruckhaus.simple-tile"}
-        self.assertEqual(monitor.determine_publish_date(p_tile, []), "2026-09-28")
-
-        p_recipes = {"name": "Simple Recipes", "id": "ubruckhaus.simple-recipes"}
-        self.assertEqual(monitor.determine_publish_date(p_recipes, []), "2026-10-03")
-
-        # 3. Dynamic lookup from marketplace issues
-        issues = [
-            {
-                "title": "[Plugin]: Another Plugin",
-                "createdAt": "2026-08-15T12:00:00Z",
-                "closedAt": "2026-08-17T15:30:00Z"
-            }
-        ]
-        p_dynamic = {"name": "Another Plugin", "id": "org.another.plugin"}
-        self.assertEqual(monitor.determine_publish_date(p_dynamic, issues), "2026-08-17")
 
     def test_acknowledgement_flow(self):
         # Setup simulated snapshot with deltas
@@ -172,50 +168,16 @@ class TestMonitor(unittest.TestCase):
         cfg = monitor.load_config()
         self.assertEqual(cfg["author"], "ubruckhaus")
 
-        err = monitor.set_author("   ")
-        self.assertEqual(err["status"], "error")
-
-    def test_discover_plugins_by_author(self):
-        # 1. Discover for default author ubruckhaus
-        plugins = monitor.discover_plugins_by_author(author="ubruckhaus")
-        plugin_ids = [p["id"] for p in plugins]
-        self.assertIn("ubruckhaus.simple-launcher-for-fools", plugin_ids)
-        self.assertIn("ubruckhaus.simple-tile", plugin_ids)
-        self.assertIn("ubruckhaus.simple-reader", plugin_ids)
-        self.assertIn("ubruckhaus.simple-recipes", plugin_ids)
-        self.assertIn("ubruckhaus.video-trans", plugin_ids)
-
-        # 2. Discover for custom author with mock repos and stats
-        mock_repos = {
-            "omarchy-cool-tool": {"description": "A very cool tool"},
-            "omarchy-my-plugins": {"description": "Should be ignored"}
-        }
-        mock_stats = {
-            "someone.cool-tool": {"views": 42},
-            "someone.awesome-bar": {"views": 10}
-        }
-        discovered_custom = monitor.discover_plugins_by_author(
-            author="someone",
-            repos=mock_repos,
-            stats=mock_stats
-        )
-        custom_ids = [p["id"] for p in discovered_custom]
-        self.assertIn("someone.cool-tool", custom_ids)
-        self.assertIn("someone.awesome-bar", custom_ids)
-        self.assertNotIn("someone.my-plugins", custom_ids)
-
-    def test_discover_skips_unpublished_local_plugins(self):
-        from unittest import mock
-        home = Path(self.tmp_dir.name) / "home"
-        for pid, name in (("ubruckhaus.pellet-stove", "Pellet Stove"), ("ubruckhaus.theme-manager", "Theme Manager")):
-            d = home / ".config" / "omarchy" / "plugins" / pid
-            d.mkdir(parents=True)
-            (d / "manifest.json").write_text(json.dumps({"id": pid, "name": name, "author": "uBruckhaus"}))
-        issues = [{"title": "[Plugin]: Theme Manager", "number": 1, "state": "CLOSED", "labels": []}]
-        with mock.patch.object(Path, "home", return_value=home):
-            ids = [p["id"] for p in monitor.discover_plugins_by_author(author="ubruckhaus", issues=issues, stats={})]
-        self.assertIn("ubruckhaus.theme-manager", ids)
-        self.assertNotIn("ubruckhaus.pellet-stove", ids)
+        # Blank means: follow the gh login; names with spaces or slashes are refused.
+        original = monitor.gh_login
+        monitor.gh_login = lambda: "ghuser"
+        try:
+            blank = monitor.set_author("   ")
+        finally:
+            monitor.gh_login = original
+        self.assertEqual((blank["status"], blank["author"]), ("ok", "ghuser"))
+        self.assertEqual(monitor.load_config()["author"], "")
+        self.assertEqual(monitor.set_author("a b")["status"], "error")
 
     def test_sort_plugins(self):
         plugins = [
@@ -268,13 +230,6 @@ class TestMonitor(unittest.TestCase):
         self.assertEqual(cfg["sort_by"], "downloads")
         self.assertEqual(cfg["sort_order"], "asc")
 
-    def test_resolve_version(self):
-        self.assertEqual(monitor.resolve_version("0.8.0", "v0.8.0"), "0.8.0")
-        self.assertEqual(monitor.resolve_version("", "v0.2.6"), "0.2.6")
-        self.assertEqual(monitor.resolve_version("1.3.2", ""), "1.3.2")
-        self.assertEqual(monitor.resolve_version("", ""), "")
-        self.assertEqual(monitor.resolve_version("0.3.0", "v0.3.3"), "0.3.0")
-
     def test_handle_request_configure_sort(self):
         state_dir = monitor.get_state_dir()
         snapshot_file = state_dir / "snapshot.json"
@@ -309,55 +264,6 @@ class TestMonitor(unittest.TestCase):
         # invalid sort rejected
         res = monitor.handle_request({"command": "set_sort", "sort_by": "bogus"})
         self.assertEqual(res["status"], "error")
-
-    def test_query_metrics_sorted_by_views_desc(self):
-        stats = {
-            "ubruckhaus.aaa": {"views": 5, "copies": 1, "hearts": 0},
-            "ubruckhaus.bbb": {"views": 50, "copies": 2, "hearts": 0},
-            "ubruckhaus.ccc": {"views": 500, "copies": 3, "hearts": 0}
-        }
-        orig_stats = monitor.fetch_marketplace_stats
-        orig_issues = monitor.fetch_marketplace_issues
-        orig_repos = monitor.fetch_github_repos
-        orig_releases = monitor.fetch_github_releases
-        monitor.fetch_marketplace_stats = lambda author=None: stats
-        monitor.fetch_marketplace_issues = lambda author=None: []
-        monitor.fetch_github_repos = lambda author=None: {}
-        monitor.fetch_github_releases = lambda author=None, repo_names=None: {}
-        try:
-            res = monitor.query_metrics()
-        finally:
-            monitor.fetch_marketplace_stats = orig_stats
-            monitor.fetch_marketplace_issues = orig_issues
-            monitor.fetch_github_repos = orig_repos
-            monitor.fetch_github_releases = orig_releases
-
-        self.assertEqual(res["sort_by"], "views")
-        self.assertEqual(res["sort_order"], "desc")
-
-        our_views = [p["views"] for p in res["plugins"] if p["id"].startswith("ubruckhaus.")]
-        self.assertEqual(our_views, sorted(our_views, reverse=True))
-
-        # marketplace deep link opens the plugin's detail page
-        for p in res["plugins"]:
-            self.assertTrue(
-                p["marketplace_url"].startswith("https://plugins.omarchy.org/plugin.html?id=" + p["id"])
-            )
-
-        # every plugin record now carries version fields
-        for p in res["plugins"]:
-            self.assertIn("version", p)
-            self.assertIn("local_version", p)
-            self.assertIn("release_version", p)
-
-        # installed plugins picked up their manifest version
-        by_id = {p["id"]: p for p in res["plugins"]}
-        self.assertTrue(by_id["ubruckhaus.simple-tile"]["local_version"])
-
-        # get_current_status re-sorts cached snapshot with same result
-        res2 = monitor.get_current_status()
-        self.assertEqual(res2["sort_by"], "views")
-        self.assertEqual(res2["sort_order"], "desc")
 
     def test_handle_request_author_and_configure(self):
         # Test configure with author and interval

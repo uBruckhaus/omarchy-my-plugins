@@ -14,11 +14,14 @@ import fcntl
 import urllib.request
 import urllib.error
 import subprocess
+import re
+import time
+import zlib
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from contextlib import contextmanager
 
-DEFAULT_AUTHOR = "ubruckhaus"
+DEFAULT_AUTHOR = ""  # empty: use the GitHub account gh is logged into
 
 # Sortable fields for the plugin list and their display labels
 SORT_FIELDS = ["views", "downloads", "hearts", "stars", "name", "date"]
@@ -26,43 +29,6 @@ SORT_ORDERS = ["asc", "desc"]
 DEFAULT_SORT_BY = "views"
 DEFAULT_SORT_ORDER = "desc"
 
-DEFAULT_PLUGINS = [
-    {
-        "name": "Launch & Bind",
-        "id": "ubruckhaus.simple-launcher-for-fools",
-        "repo_name": "omarchy-simple-launcher-for-fools",
-        "display_icon": "rocket",
-        "publish_date": "2026-09-27"
-    },
-    {
-        "name": "Workspace Presets",
-        "id": "ubruckhaus.simple-tile",
-        "repo_name": "omarchy-simple-tile",
-        "display_icon": "tile",
-        "publish_date": "2026-09-28"
-    },
-    {
-        "name": "Video Trans",
-        "id": "ubruckhaus.video-trans",
-        "repo_name": "omarchy-video-trans",
-        "display_icon": "video",
-        "publish_date": "2026-10-01"
-    },
-    {
-        "name": "Simple Reader",
-        "id": "ubruckhaus.simple-reader",
-        "repo_name": "omarchy-simple-reader",
-        "display_icon": "reader",
-        "publish_date": "2026-10-01"
-    },
-    {
-        "name": "Simple Recipes",
-        "id": "ubruckhaus.simple-recipes",
-        "repo_name": "omarchy-simple-recipes",
-        "display_icon": "recipes",
-        "publish_date": "2026-10-03"
-    }
-]
 
 def get_runtime_dir():
     runtime = os.environ.get("XDG_RUNTIME_DIR")
@@ -147,12 +113,17 @@ def get_config_dir():
         base = Path(config_home)
     else:
         base = Path.home() / ".config"
-    d = base / "omarchy" / "plugins" / "ubruckhaus.my-plugins"
+    # Plugin directories are watched for code reloads. Settings must live
+    # outside them, otherwise changing a preference destroys the open panel.
+    d = base / "omarchy" / "my-plugins"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 def load_config():
     cfg_file = get_config_dir() / "config.json"
+    if not cfg_file.is_file():
+        # Keep existing preferences until the first save writes the new path.
+        cfg_file = get_config_dir().parent / "plugins" / "ubruckhaus.my-plugins" / "config.json"
     if cfg_file.is_file():
         try:
             with open(cfg_file, "r", encoding="utf-8") as f:
@@ -171,7 +142,7 @@ def load_config():
         "interval_minutes": 5,
         "sort_by": DEFAULT_SORT_BY,
         "sort_order": DEFAULT_SORT_ORDER,
-        "plugins": DEFAULT_PLUGINS
+        "plugins": []
     }
 
 def save_config(cfg):
@@ -201,191 +172,167 @@ def save_json_file(path, data):
         json.dump(data, f, indent=2)
     os.replace(tmp, path)
 
-def fetch_marketplace_stats(author=DEFAULT_AUTHOR):
-    url = "https://api.omarchyplugins.com/v1/stats"
+STATS_URL = "https://api.omarchyplugins.com/v1/stats"
+CATALOG_URL = "https://raw.githubusercontent.com/omacom/omarchy-plugin-marketplace/main/site/catalog.json"
+CATALOG_MAX_AGE = 3600          # refresh the cached catalog at most hourly (ETag makes it cheap)
+CATALOG_LIMIT = 64 * 1024 * 1024
+STATS_LIMIT = 8 * 1024 * 1024
+ACCOUNT_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
+REPO_RE = re.compile(r"^https://github\.com/([A-Za-z0-9-]{1,39})/([A-Za-z0-9._-]{1,100})/?$")
+
+
+def http_get(url, limit, timeout=20, etag=None):
+    """GET with a byte cap and one overall deadline. Returns (status, body, etag);
+    status 304 means the cached copy is current. Raises ValueError on oversize/slow replies."""
+    deadline = time.monotonic() + timeout
+    headers = {"User-Agent": "OmarchyMyPlugins/1.2", "Accept-Encoding": "gzip"}
+    if etag:
+        headers["If-None-Match"] = etag
+    req = urllib.request.Request(url, headers=headers)
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "OmarchyMyPlugins/1.0"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            all_plugins = data.get("plugins", {})
-            prefix = author.lower() + "."
-            author_stats = {k: v for k, v in all_plugins.items() if k.lower().startswith(prefix)}
-            return author_stats if author_stats else all_plugins
+        resp = urllib.request.urlopen(req, timeout=min(10, timeout))
+    except urllib.error.HTTPError as error:
+        if error.code == 304:
+            return 304, b"", etag
+        raise
+    with resp:
+        if int(resp.headers.get("Content-Length") or 0) > limit:
+            raise ValueError("reply too large")
+        chunks, size = [], 0
+        while True:
+            if time.monotonic() > deadline:
+                raise ValueError("reply took too long")
+            chunk = resp.read1(256 * 1024)  # returns what has arrived, so the deadline is checked often
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > limit:
+                raise ValueError("reply too large")
+            chunks.append(chunk)
+        body = b"".join(chunks)
+        if resp.headers.get("Content-Encoding") == "gzip":
+            decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+            body = decoder.decompress(body, limit + 1)
+            if len(body) > limit or decoder.unconsumed_tail:
+                raise ValueError("reply too large")
+        return resp.status, body, resp.headers.get("ETag")
+
+
+def valid_account(account):
+    return isinstance(account, str) and bool(ACCOUNT_RE.match(account))
+
+
+def gh_login():
+    """The GitHub account gh is logged into, used when no account is configured."""
+    try:
+        res = subprocess.run(["gh", "api", "user", "--jq", ".login"], capture_output=True, text=True, timeout=6)
+        login = res.stdout.strip()[:64] if res.returncode == 0 else ""
+        return login if valid_account(login) else ""
+    except Exception:
+        return ""
+
+
+def resolve_account(cfg, override=None):
+    """Configured GitHub account (owner of the plugin repositories), else the gh login."""
+    for candidate in (override, cfg.get("author")):
+        if candidate and valid_account(str(candidate).strip()):
+            return str(candidate).strip()
+    return gh_login()
+
+
+def repo_owner(url):
+    match = REPO_RE.match(str(url or "").removesuffix(".git"))
+    return (match.group(1), match.group(2)) if match else (None, None)
+
+
+def fetch_marketplace_stats():
+    """{plugin id: {views, copies, hearts}} for every listed plugin."""
+    try:
+        _status, body, _etag = http_get(STATS_URL, STATS_LIMIT, timeout=15)
+        plugins = json.loads(body.decode("utf-8")).get("plugins", {})
+        return plugins if isinstance(plugins, dict) else {}
     except Exception as e:
-        sys.stderr.write(f"Warning: Failed to fetch marketplace stats for author '{author}': {e}\n")
+        sys.stderr.write(f"Warning: Failed to fetch marketplace stats: {e}\n")
         return {}
 
-def fetch_marketplace_issues(author=DEFAULT_AUTHOR):
+
+CATALOG_FIELDS = ("id", "name", "author", "repo", "version", "stars", "listedAt", "verificationStatus", "description")
+
+
+def fetch_catalog(state_dir=None, now=None):
+    """Listed plugins from the marketplace catalog, cached (with ETag) in the state directory."""
+    state_dir = state_dir or get_state_dir()
+    cache_file = state_dir / "catalog.json"
+    cache = load_json_file(cache_file, fallback={}) or {}
+    now = now if now is not None else time.time()
+    if cache.get("plugins") and now - float(cache.get("fetched_at", 0)) < CATALOG_MAX_AGE:
+        return cache["plugins"]
+    try:
+        status, body, etag = http_get(CATALOG_URL, CATALOG_LIMIT, timeout=60, etag=cache.get("etag") if cache.get("plugins") else None)
+        if status == 304:
+            cache["fetched_at"] = now
+        else:
+            data = json.loads(body.decode("utf-8"))
+            entries = data.get("plugins", []) if isinstance(data, dict) else []
+            plugins = []
+            for entry in entries if isinstance(entries, list) else []:
+                if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                    plugins.append({k: entry.get(k) for k in CATALOG_FIELDS})
+            cache = {"etag": etag, "fetched_at": now, "plugins": plugins}
+        save_json_file(cache_file, cache)
+    except Exception as e:
+        sys.stderr.write(f"Warning: Failed to fetch marketplace catalog: {e}\n")
+    return cache.get("plugins", [])
+
+
+def fetch_marketplace_issues(account):
     try:
         res = subprocess.run(
-            ["gh", "issue", "list", "--repo", "omacom/omarchy-plugin-marketplace", "--author", author, "--state", "all", "--json", "number,title,state,labels,createdAt,closedAt,updatedAt,url"],
-            capture_output=True,
-            text=True,
-            timeout=6
-        )
+            ["gh", "issue", "list", "--repo", "omacom/omarchy-plugin-marketplace", "--author", account, "--state", "all",
+             "--limit", "200", "--json", "number,title,body,state,labels,createdAt,closedAt,updatedAt,url"],
+            capture_output=True, text=True, timeout=10)
         if res.returncode == 0:
             return json.loads(res.stdout)
     except Exception as e:
-        sys.stderr.write(f"Warning: Failed to fetch marketplace issues for author '{author}': {e}\n")
+        sys.stderr.write(f"Warning: Failed to fetch marketplace issues for '{account}': {e}\n")
     return []
 
-def fetch_github_releases(author=DEFAULT_AUTHOR, repo_names=None):
-    """Latest release tag per repository: {repo_name: tagName}.
 
-    Repos without releases (or unreachable) are simply omitted.
-    """
-    releases = {}
-    if not repo_names:
-        return releases
-    for rname in repo_names:
-        if not rname:
-            continue
-        try:
-            res = subprocess.run(
-                ["gh", "release", "view", "--repo", f"{author}/{rname}", "--json", "tagName"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if res.returncode == 0:
-                tag = (json.loads(res.stdout).get("tagName") or "").strip()
-                if tag:
-                    releases[rname] = tag
-        except Exception:
-            pass
-    return releases
-
-def resolve_version(local_version, release_tag):
-    """Prefer the local (installed) version, fall back to the release tag."""
-    local = str(local_version or "").strip()
-    release = str(release_tag or "").strip()
-    if release[:1] in ("v", "V"):
-        release = release[1:]
-    return local or release
-
-def fetch_github_repos(author=DEFAULT_AUTHOR):
+def fetch_github_repos(account):
+    """Live star counts: {repo name: {stargazerCount, url, description}} (the catalog refreshes daily)."""
     try:
-        res = subprocess.run(
-            ["gh", "repo", "list", author, "--json", "name,description,stargazerCount,url,createdAt,pushedAt"],
-            capture_output=True,
-            text=True,
-            timeout=6
-        )
+        res = subprocess.run(["gh", "repo", "list", account, "--limit", "300", "--json", "name,description,stargazerCount,url"],
+                             capture_output=True, text=True, timeout=10)
         if res.returncode == 0:
-            repos_list = json.loads(res.stdout)
-            return {r["name"]: r for r in repos_list}
+            return {r["name"]: r for r in json.loads(res.stdout)}
     except Exception as e:
-        sys.stderr.write(f"Warning: Failed to fetch github repos for author '{author}': {e}\n")
+        sys.stderr.write(f"Warning: Failed to fetch GitHub repos for '{account}': {e}\n")
     return {}
 
-def discover_plugins_by_author(author=DEFAULT_AUTHOR, repos=None, issues=None, stats=None):
-    discovered = {}
 
-    # Seed with DEFAULT_PLUGINS matching this author
-    for p in DEFAULT_PLUGINS:
-        if p["id"].lower().startswith(author.lower() + ".") or author.lower() in p["id"].lower():
-            discovered[p["id"]] = dict(p)
+def discover_plugins(account, catalog, issues=None):
+    """Plugins listed in the marketplace whose repository belongs to `account`."""
+    wanted = account.lower()
+    found = []
+    for entry in catalog:
+        owner, repo_name = repo_owner(entry.get("repo"))
+        if not owner or owner.lower() != wanted:
+            continue
+        found.append({
+            "id": entry["id"],
+            "name": str(entry.get("name") or entry["id"]),
+            "repo_name": repo_name,
+            "repo_url": f"https://github.com/{owner}/{repo_name}",
+            "display_icon": "plugin",
+            "description": str(entry.get("description") or ""),
+            "version": str(entry.get("version") or ""),
+            "publish_date": str(entry.get("listedAt") or "")[:10],
+            "catalog_stars": int(entry.get("stars") or 0),
+            "verified": entry.get("verificationStatus") == "verified",
+        })
+    found.sort(key=lambda x: x.get("publish_date") or "9999")
+    return found
 
-    # 1. Local installed plugins in ~/.config/omarchy/plugins/
-    p_dir = Path.home() / ".config" / "omarchy" / "plugins"
-    if p_dir.is_dir():
-        for d in p_dir.iterdir():
-            if d.is_dir() and not d.name.endswith(".my-plugins"):
-                mf = d / "manifest.json"
-                if mf.is_file():
-                    try:
-                        with open(mf, "r", encoding="utf-8") as f:
-                            m = json.load(f)
-                        pid = m.get("id", "")
-                        p_auth = m.get("author", "").lower()
-                        if p_auth == author.lower() or "uwe bruckhaus" in p_auth or pid.lower().startswith(author.lower() + "."):
-                            name = m.get("name", "")
-                            icon = "plugin"
-                            nl = name.lower()
-                            if "launcher" in nl: icon = "rocket"
-                            elif "tile" in nl: icon = "tile"
-                            elif "video" in nl: icon = "video"
-                            elif "reader" in nl: icon = "reader"
-                            elif "recipe" in nl: icon = "recipes"
-
-                            clean_suffix = d.name.replace(f"{author}.", "")
-                            repo_name = f"omarchy-{clean_suffix}"
-                            mf_version = m.get("version", "")
-                            if pid not in discovered:
-                                discovered[pid] = {
-                                    "id": pid,
-                                    "name": name,
-                                    "repo_name": repo_name,
-                                    "display_icon": icon,
-                                    "description": m.get("description", ""),
-                                    "version": mf_version
-                                }
-                            else:
-                                # The installed manifest is authoritative for display names (renames)
-                                if name:
-                                    discovered[pid]["name"] = name
-                                if not discovered[pid].get("description"):
-                                    discovered[pid]["description"] = m.get("description", "")
-                                if not discovered[pid].get("version"):
-                                    discovered[pid]["version"] = mf_version
-                    except Exception:
-                        pass
-
-    # 2. GitHub repos for author
-    if repos:
-        for rname, r in repos.items():
-            if rname in ("omarchy-my-plugins", "my-plugins"):
-                continue
-            clean_name = rname.replace("omarchy-", "")
-            matched_pid = None
-            for pid, pdata in discovered.items():
-                if pdata.get("repo_name") == rname or clean_name in pid:
-                    matched_pid = pid
-                    break
-            if not matched_pid:
-                matched_pid = f"{author}.{clean_name}"
-                pname = clean_name.replace("-", " ").title()
-                icon = "plugin"
-                nl = pname.lower()
-                if "launcher" in nl: icon = "rocket"
-                elif "tile" in nl: icon = "tile"
-                elif "video" in nl: icon = "video"
-                elif "reader" in nl: icon = "reader"
-                elif "recipe" in nl: icon = "recipes"
-
-                discovered[matched_pid] = {
-                    "id": matched_pid,
-                    "name": pname,
-                    "repo_name": rname,
-                    "display_icon": icon,
-                    "description": r.get("description", "")
-                }
-            if r.get("description") and not discovered[matched_pid].get("description"):
-                discovered[matched_pid]["description"] = r.get("description")
-
-    # 3. Stats keys for author
-    if stats:
-        for pid in stats.keys():
-            if pid not in discovered and pid.lower().startswith(author.lower() + "."):
-                clean_name = pid.replace(f"{author}.", "")
-                pname = clean_name.replace("-", " ").title()
-                discovered[pid] = {
-                    "id": pid,
-                    "name": pname,
-                    "repo_name": f"omarchy-{clean_name}",
-                    "display_icon": "plugin"
-                }
-
-    # Only list published plugins: known defaults, marketplace stats, or a marketplace issue.
-    # Local-only plugins (installed but never submitted) are skipped.
-    default_ids = {p["id"] for p in DEFAULT_PLUGINS}
-    stats_ids = set(stats.keys()) if stats else set()
-    result = [
-        p for p in discovered.values()
-        if p["id"] in default_ids or p["id"] in stats_ids or has_marketplace_issue(p, issues or [])
-    ]
-    result.sort(key=lambda x: x.get("publish_date") or "9999")
-    return result
 
 def has_marketplace_issue(plugin_dict, issues):
     pname_lower = plugin_dict.get("name", "").lower()
@@ -396,43 +343,6 @@ def has_marketplace_issue(plugin_dict, issues):
         if (pname_lower and pname_lower in title_lower) or (clean_id and clean_id in title_lower):
             return True
     return False
-
-def determine_publish_date(plugin_dict, issues):
-    if plugin_dict.get("publish_date"):
-        return plugin_dict["publish_date"]
-
-    known_dates = {
-        "ubruckhaus.simple-launcher-for-fools": "2026-09-27",
-        "ubruckhaus.simple-tile": "2026-09-28",
-        "ubruckhaus.video-trans": "2026-10-01",
-        "ubruckhaus.simple-reader": "2026-10-01",
-        "ubruckhaus.simple-recipes": "2026-10-03",
-    }
-    pid = plugin_dict.get("id", "")
-    if pid in known_dates:
-        return known_dates[pid]
-
-    pname_lower = plugin_dict.get("name", "").lower()
-    clean_id = pid.split(".")[-1].lower() if pid and "." in pid else (pid.lower() if pid else "")
-    repo_clean = plugin_dict.get("repo_name", "").replace("omarchy-", "").lower()
-
-    matching = []
-    for i in issues:
-        title_lower = i.get("title", "").lower()
-        if (pname_lower and pname_lower in title_lower) or \
-           (clean_id and clean_id in title_lower) or \
-           (repo_clean and repo_clean in title_lower):
-            matching.append(i)
-
-    if matching:
-        matching.sort(key=lambda x: x.get("createdAt", ""))
-        earliest = matching[0]
-        if earliest.get("closedAt"):
-            return earliest["closedAt"][:10]
-        if earliest.get("createdAt"):
-            return earliest["createdAt"][:10]
-
-    return ""
 
 def determine_status(plugin_or_name, issues):
     if isinstance(plugin_or_name, dict):
@@ -451,7 +361,10 @@ def determine_status(plugin_or_name, issues):
 
     for i in issues:
         title_lower = i.get("title", "").lower()
-        if (pname_lower and pname_lower in title_lower) or \
+        # [Verify] requests name the plugin ID in their body; titles may carry a newer display name.
+        body_lower = str(i.get("body") or "")[:20000].lower()
+        if (pid and pid.lower() in body_lower) or \
+           (pname_lower and pname_lower in title_lower) or \
            (clean_id and clean_id in title_lower) or \
            (rname_clean and rname_clean in title_lower):
             matching.append(i)
@@ -485,18 +398,17 @@ def query_metrics(author=None):
     ack_file = state_dir / "acknowledged.json"
 
     cfg = load_config()
-    author = (author or cfg.get("author", DEFAULT_AUTHOR)).strip()
     interval = cfg.get("interval_minutes", 5)
+    author = resolve_account(cfg, author)
+    if not author:
+        return {"status": "error", "author": "", "needs_account": True, "plugins": [],
+                "message": "Enter your GitHub account: the owner of your plugin repositories."}
 
-    stats = fetch_marketplace_stats(author=author)
-    issues = fetch_marketplace_issues(author=author)
-    repos = fetch_github_repos(author=author)
-
-    tracked = discover_plugins_by_author(author=author, repos=repos, issues=issues, stats=stats)
-    releases = fetch_github_releases(
-        author=author,
-        repo_names=[p.get("repo_name", "") for p in tracked]
-    )
+    stats = fetch_marketplace_stats()
+    catalog = fetch_catalog(state_dir)
+    issues = fetch_marketplace_issues(author)
+    repos = fetch_github_repos(author)
+    tracked = discover_plugins(author, catalog, issues)
 
     # Load baseline acknowledged state
     ack_state = load_json_file(ack_file, fallback={})
@@ -524,17 +436,16 @@ def query_metrics(author=None):
         hearts = int(st.get("hearts", 0))
 
         rp = repos.get(repo_name, {})
-        stars = int(rp.get("stargazerCount", 0))
-        repo_url = rp.get("url", f"https://github.com/{author}/{repo_name}")
+        stars = int(rp.get("stargazerCount", p.get("catalog_stars", 0)) or 0)
+        repo_url = p.get("repo_url")
         description = p.get("description") or rp.get("description", "")
-
-        release_tag = releases.get(repo_name, "")
-        release_version = release_tag[1:] if release_tag[:1] in ("v", "V") else release_tag
-        local_version = str(p.get("version", "") or "").strip()
-        version = local_version or release_version
+        version = p.get("version", "")
+        local_version = release_version = version
 
         status_text, status_code, issue_num, issue_url = determine_status(p, issues)
-        publish_date = determine_publish_date(p, issues)
+        if status_code == "published" and p.get("verified"):
+            status_text, status_code = "Listed & Verified", "verified"
+        publish_date = p.get("publish_date", "")
 
         total_views += views
         total_downloads += downloads
@@ -641,8 +552,81 @@ def query_metrics(author=None):
             "plugins_map": plugins_map
         })
 
+    record_history(plugins_map, state_dir)
     save_json_file(snapshot_file, result)
     return result
+
+
+HISTORY_DAYS = 400
+METRICS = ("views", "downloads", "hearts", "stars")
+RANGES = {"daily": 30, "weekly": 12, "monthly": 12}
+
+
+def record_history(plugins_map, state_dir=None, today=None):
+    """Keep one snapshot per day: {date: {plugin id: [views, downloads, hearts, stars]}}."""
+    state_dir = state_dir or get_state_dir()
+    path = state_dir / "history.json"
+    history = load_json_file(path, fallback={}) or {}
+    days = history.get("days") if isinstance(history.get("days"), dict) else {}
+    day = (today or datetime.now().date()).isoformat()
+    days[day] = {pid: [int(v.get(m, 0)) for m in METRICS] for pid, v in plugins_map.items()}
+    for old in sorted(days)[:-HISTORY_DAYS]:
+        del days[old]
+    with runtime_lock("my_plugins_history.lock"):
+        save_json_file(path, {"schema": 1, "days": days})
+
+
+def history_series(plugin="all", metric="views", period="daily", state_dir=None, today=None):
+    """Gains per day, ISO week or month for one plugin or all, from the daily snapshots.
+
+    Periods without any snapshot so far have value None (history starts with the first refresh)."""
+    if metric not in METRICS or period not in RANGES:
+        return {"status": "error", "message": "unknown metric or range"}
+    index = METRICS.index(metric)
+    history = load_json_file((state_dir or get_state_dir()) / "history.json", fallback={}) or {}
+    days = history.get("days") if isinstance(history.get("days"), dict) else {}
+
+    def total(snapshot):
+        values = [v[index] for pid, v in snapshot.items() if plugin in ("all", pid) and isinstance(v, list) and len(v) == 4]
+        return sum(values) if values else None
+
+    totals = {datetime.strptime(d, "%Y-%m-%d").date(): total(snap) for d, snap in days.items()}
+    totals = {d: t for d, t in totals.items() if t is not None}
+    today = today or datetime.now().date()
+
+    def bucket_end(offset):
+        if period == "daily":
+            start = today - timedelta(days=offset)
+            return start, start, start.strftime("%d.%m")
+        if period == "weekly":
+            monday = today - timedelta(days=today.weekday()) - timedelta(weeks=offset)
+            return monday, monday + timedelta(days=6), "W" + monday.strftime("%V")
+        year, month = today.year, today.month - offset
+        while month < 1:
+            month += 12
+            year -= 1
+        first = date(year, month, 1)
+        last = (date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1))
+        return first, last, first.strftime("%b")
+
+    labels, values, ends = [], [], []
+    count = RANGES[period]
+    for offset in range(count - 1, -1, -1):
+        first, last, label = bucket_end(offset)
+        labels.append(label)
+        inside = [d for d in totals if first <= d <= last]
+        before = [d for d in totals if d < first]
+        if not inside:
+            values.append(None)
+            ends.append(None)
+            continue
+        end_value = totals[max(inside)]
+        start_value = totals[max(before)] if before else totals[min(inside)]
+        values.append(max(0, end_value - start_value))
+        ends.append(end_value)
+    return {"status": "ok", "plugin": plugin, "metric": metric, "range": period,
+            "labels": labels, "values": values, "totals": ends,
+            "first_day": min(totals).isoformat() if totals else None}
 
 def acknowledge_changes(author=None):
     state_dir = get_state_dir()
@@ -755,9 +739,15 @@ def set_interval(minutes):
 
 def set_author(author):
     try:
-        a = str(author).strip()
-        if not a:
-            return {"status": "error", "message": "empty author"}
+        a = str(author or "").strip()
+        if a == "":
+            # Empty means: follow the account gh is logged into.
+            cfg = load_config()
+            cfg["author"] = ""
+            save_config(cfg)
+            return {"status": "ok", "author": gh_login()}
+        if not valid_account(a):
+            return {"status": "error", "message": "Enter a GitHub account name (letters, digits and hyphens)."}
         cfg = load_config()
         cfg["author"] = a
         save_config(cfg)
@@ -788,7 +778,9 @@ def handle_request(req):
         if "interval_minutes" in settings:
             set_interval(settings["interval_minutes"])
         if "author" in settings:
-            set_author(settings["author"])
+            res = set_author(settings["author"])
+            if res.get("status") != "ok":
+                return res
         if "sort_by" in settings or "sort_order" in settings:
             res = set_sort(settings.get("sort_by"), settings.get("sort_order"))
             if res.get("status") != "ok":
@@ -800,9 +792,12 @@ def handle_request(req):
             return res
         return get_current_status(author=author)
     elif cmd == "set_author":
-        if "author" in req:
-            set_author(req["author"])
-        return query_metrics(author=req.get("author"))
+        res = set_author(req.get("author", ""))
+        if res.get("status") != "ok":
+            return res
+        return query_metrics(author=res["author"] or None)
+    elif cmd == "history":
+        return history_series(str(req.get("plugin", "all")), str(req.get("metric", "views")), str(req.get("range", "daily")))
     elif cmd == "open_url":
         return open_url(req.get("url", ""))
     else:
