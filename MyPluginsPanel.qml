@@ -15,6 +15,7 @@ Ui.Panel {
     property string author: ""
     property bool needsAccount: false
     property string accountMessage: ""
+    property string accountSource: ""
     property bool editAccount: false
     property var history: ({})
     property string historyMetric: "views"
@@ -99,7 +100,7 @@ Ui.Panel {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: Style.space(8)
 
-                        Text {
+                        Text { textFormat: Text.PlainText;
                             text: "🛍️"
                             font.pixelSize: Style.font.title
                         }
@@ -107,7 +108,7 @@ Ui.Panel {
                         Column {
                             Row {
                                 spacing: Style.space(6)
-                                Text {
+                                Text { textFormat: Text.PlainText;
                                     text: "My Plugins"
                                     color: Color.accent
                                     font.family: Style.font.family
@@ -120,7 +121,7 @@ Ui.Panel {
                                     radius: Style.space(8)
                                     color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
                                     anchors.verticalCenter: parent.verticalCenter
-                                    Text {
+                                    Text { textFormat: Text.PlainText;
                                         id: authorBadgeText
                                         anchors.centerIn: parent
                                         text: root.author ? "@" + root.author + " ✎" : "set account ✎"
@@ -132,7 +133,7 @@ Ui.Panel {
                                 }
                                 }
                             }
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: "Omarchy Marketplace & GitHub Monitor"
                                 color: Color.foreground
                                 opacity: 0.6
@@ -193,13 +194,13 @@ Ui.Panel {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: Style.space(6)
 
-                                Text {
+                                Text { textFormat: Text.PlainText;
                                     text: "⚡"
                                     font.pixelSize: Style.font.body
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
-                                Text {
+                                Text { textFormat: Text.PlainText;
                                     text: "New updates detected!"
                                     color: Color.accent
                                     font.pixelSize: Style.font.body
@@ -219,7 +220,7 @@ Ui.Panel {
                             }
                         }
 
-                        Text {
+                        Text { textFormat: Text.PlainText;
                             width: parent.width
                             text: root.changesSummary !== "" ? root.changesSummary : "Metrics or status updated in latest query."
                             color: Color.foreground
@@ -247,14 +248,14 @@ Ui.Panel {
                         Column {
                             anchors.centerIn: parent
                             spacing: Style.space(2)
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: "👁 Views"
                                 color: Color.foreground
                                 opacity: 0.65
                                 font.pixelSize: Style.font.caption
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: String(root.totalViews)
                                 color: Color.foreground
                                 font.pixelSize: Style.font.title
@@ -276,14 +277,14 @@ Ui.Panel {
                         Column {
                             anchors.centerIn: parent
                             spacing: Style.space(2)
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: "📥 Downloads"
                                 color: Color.foreground
                                 opacity: 0.65
                                 font.pixelSize: Style.font.caption
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: String(root.totalDownloads)
                                 color: Color.foreground
                                 font.pixelSize: Style.font.title
@@ -305,14 +306,14 @@ Ui.Panel {
                         Column {
                             anchors.centerIn: parent
                             spacing: Style.space(2)
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: "❤️ Hearts"
                                 color: Color.foreground
                                 opacity: 0.65
                                 font.pixelSize: Style.font.caption
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: String(root.totalHearts)
                                 color: Color.foreground
                                 font.pixelSize: Style.font.title
@@ -334,14 +335,14 @@ Ui.Panel {
                         Column {
                             anchors.centerIn: parent
                             spacing: Style.space(2)
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: "⭐ GH Stars"
                                 color: Color.foreground
                                 opacity: 0.65
                                 font.pixelSize: Style.font.caption
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: String(root.totalStars)
                                 color: Color.foreground
                                 font.pixelSize: Style.font.title
@@ -370,7 +371,7 @@ Ui.Panel {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: Style.space(6)
 
-                            Text {
+                            Text { textFormat: Text.PlainText;
                                 text: "Interval:"
                                 color: Color.foreground
                                 opacity: 0.8
@@ -392,7 +393,7 @@ Ui.Panel {
                             }
                         }
 
-                        Text {
+                        Text { textFormat: Text.PlainText;
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             text: "Updated: " + root.formatTime(root.lastUpdatedText)
@@ -416,13 +417,14 @@ Ui.Panel {
                         id: accountColumn
                         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
                         spacing: Style.space(6)
-                        Text { width: parent.width; text: "GitHub account"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
+                        Text { textFormat: Text.PlainText; width: parent.width; text: "GitHub account"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
                         Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Plugins are found in the marketplace catalog by repository owner: for github.com/uBruckhaus/omarchy-theme-manager the account is uBruckhaus. Leave it empty to use the account gh is logged into."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
                         Row {
                             width: parent.width; spacing: Style.space(6)
                             Ui.TextField { id: accountField; width: parent.width - saveAccount.width - Style.space(6); text: root.author; placeholderText: "GitHub account, e.g. uBruckhaus"; onAccepted: root.accountSubmitted(text.trim()) }
                             Ui.Button { id: saveAccount; focusable: true; bordered: true; text: "Save"; onClicked: { root.accountSubmitted(accountField.text.trim()); root.editAccount = false } }
                         }
+                        Text { width: parent.width; visible: root.author !== "" && root.accountSource !== "" && root.accountSource !== "settings"; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Using @" + root.author + ", detected from " + root.accountSource + " on this computer. Save to keep it, or enter another account."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
                         Text { width: parent.width; visible: root.accountMessage !== ""; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.accountMessage; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.caption }
                     }
                 }
@@ -441,8 +443,8 @@ Ui.Panel {
                         spacing: Style.space(8)
                         Row {
                             width: parent.width; spacing: Style.space(8)
-                            Text { text: "📈 History"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
-                            Text { anchors.verticalCenter: parent.verticalCenter; color: Color.foreground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption
+                            Text { textFormat: Text.PlainText; text: "📈 History"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
+                            Text { textFormat: Text.PlainText; anchors.verticalCenter: parent.verticalCenter; color: Color.foreground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption
                                    text: root.hoveredBar >= 0 && root.historyValues[root.hoveredBar] !== null
                                          ? (root.history.labels || [])[root.hoveredBar] + ": +" + root.historyValues[root.hoveredBar] + " (" + (root.history.totals || [])[root.hoveredBar] + " total)"
                                          : "+" + root.historyGain + " in this range" }
@@ -477,7 +479,7 @@ Ui.Panel {
                                     radius: Math.min(3, width / 2)
                                     color: modelData === null ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
                                                               : (root.hoveredBar === index ? Color.foreground : Color.accent)
-                                    Text { visible: modelData !== null && modelData > 0 && chart.count <= 12; anchors.bottom: parent.top; anchors.horizontalCenter: parent.horizontalCenter
+                                    Text { textFormat: Text.PlainText; visible: modelData !== null && modelData > 0 && chart.count <= 12; anchors.bottom: parent.top; anchors.horizontalCenter: parent.horizontalCenter
                                            text: modelData; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1 }
                                     MouseArea { anchors.fill: parent; anchors.topMargin: -chart.height; hoverEnabled: true
                                                 onEntered: root.hoveredBar = index; onExited: if (root.hoveredBar === index) root.hoveredBar = -1 }
@@ -488,7 +490,7 @@ Ui.Panel {
                             width: parent.width; height: Style.space(14)
                             Repeater {
                                 model: root.history.labels || []
-                                Text { required property var modelData; required property int index
+                                Text { textFormat: Text.PlainText; required property var modelData; required property int index
                                        visible: chart.count <= 12 || index % 5 === (chart.count - 1) % 5
                                        x: index * chart.slot + chart.slot / 2 - width / 2
                                        text: modelData; color: Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1 }
@@ -519,7 +521,7 @@ Ui.Panel {
                         anchors.rightMargin: Style.space(10)
                         spacing: Style.space(10)
 
-                        Text {
+                        Text { textFormat: Text.PlainText;
                             text: "Sort:"
                             color: Color.foreground
                             opacity: 0.8
@@ -573,7 +575,7 @@ Ui.Panel {
                         anchors.rightMargin: Style.space(10)
                         spacing: Style.space(8)
 
-                        Text {
+                        Text { textFormat: Text.PlainText;
                             width: Style.space(92)
                             text: "PUBLISHED"
                             color: Color.foreground
@@ -583,7 +585,7 @@ Ui.Panel {
                             font.bold: true
                         }
 
-                        Text {
+                        Text { textFormat: Text.PlainText;
                             width: Style.space(150)
                             text: "PLUGIN"
                             color: Color.foreground
@@ -593,7 +595,7 @@ Ui.Panel {
                             font.bold: true
                         }
 
-                        Text {
+                        Text { textFormat: Text.PlainText;
                             text: "STATUS / VERIFICATION"
                             color: Color.foreground
                             opacity: 0.5
@@ -643,11 +645,11 @@ Ui.Panel {
                                         Row {
                                             anchors.centerIn: parent
                                             spacing: Style.space(4)
-                                            Text {
+                                            Text { textFormat: Text.PlainText;
                                                 text: "📅"
                                                 font.pixelSize: Style.font.caption - 2
                                             }
-                                            Text {
+                                            Text { textFormat: Text.PlainText;
                                                 text: modelData.publish_date || "—"
                                                 color: Color.foreground
                                                 font.family: Style.font.family
@@ -667,7 +669,7 @@ Ui.Panel {
                                             anchors.verticalCenter: parent.verticalCenter
                                             spacing: Style.space(6)
 
-                                            Text {
+                                            Text { textFormat: Text.PlainText;
                                                 text: {
                                                     var ic = modelData.display_icon
                                                     if (ic === "rocket") return "🚀"
@@ -680,7 +682,7 @@ Ui.Panel {
                                                 font.pixelSize: Style.font.body
                                             }
 
-                                            Text {
+                                            Text { textFormat: Text.PlainText;
                                                 text: modelData.name
                                                 color: Color.foreground
                                                 font.family: Style.font.family
@@ -713,7 +715,7 @@ Ui.Panel {
                                             return "#1d76db"
                                         }
 
-                                        Text {
+                                        Text { textFormat: Text.PlainText;
                                             id: statusText
                                             anchors.centerIn: parent
                                             text: modelData.status_text
@@ -731,7 +733,7 @@ Ui.Panel {
                                 }
 
                                 // Issue Number link
-                                Text {
+                                Text { textFormat: Text.PlainText;
                                     visible: modelData.issue_number !== null
                                     anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
@@ -755,8 +757,8 @@ Ui.Panel {
                                 // GitHub release alongside when it differs.
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "📦 Ver:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text {
+                                    Text { textFormat: Text.PlainText; text: "📦 Ver:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText;
                                         text: {
                                             var v = modelData.local_version || modelData.release_version || ""
                                             if (v === "") return "—"
@@ -775,15 +777,15 @@ Ui.Panel {
                                 // Views
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "👁 Views:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: String(modelData.views); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText; text: "👁 Views:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText; text: String(modelData.views); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                     Rectangle {
                                         visible: modelData.views_delta > 0
                                         height: Style.space(14)
                                         width: viewsDeltaText.implicitWidth + 6
                                         radius: 3
                                         color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
-                                        Text {
+                                        Text { textFormat: Text.PlainText;
                                             id: viewsDeltaText
                                             anchors.centerIn: parent
                                             text: "+" + modelData.views_delta
@@ -797,15 +799,15 @@ Ui.Panel {
                                 // Downloads
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "📥 Copies:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: String(modelData.downloads); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText; text: "📥 Copies:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText; text: String(modelData.downloads); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                     Rectangle {
                                         visible: modelData.downloads_delta > 0
                                         height: Style.space(14)
                                         width: dlDeltaText.implicitWidth + 6
                                         radius: 3
                                         color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
-                                        Text {
+                                        Text { textFormat: Text.PlainText;
                                             id: dlDeltaText
                                             anchors.centerIn: parent
                                             text: "+" + modelData.downloads_delta
@@ -819,15 +821,15 @@ Ui.Panel {
                                 // Hearts
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "❤️ Hearts:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: String(modelData.hearts); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText; text: "❤️ Hearts:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText; text: String(modelData.hearts); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                 }
 
                                 // Stars
                                 Row {
                                     spacing: Style.space(4)
-                                    Text { text: "⭐ GH Stars:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                    Text { text: String(modelData.stars); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText; text: "⭐ GH Stars:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                    Text { textFormat: Text.PlainText; text: String(modelData.stars); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                 }
                             }
 

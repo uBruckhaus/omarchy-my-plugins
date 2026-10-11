@@ -61,7 +61,7 @@ class DiscoveryTests(Isolated):
             self.assertEqual(monitor.resolve_account(monitor.load_config()), "ghuser")
 
     def test_missing_account_asks_for_one(self):
-        with patch("monitor.gh_login", return_value=""):
+        with patch("monitor.detect_account", return_value=("", "")), patch("monitor.fetch_catalog", return_value=CATALOG):
             result = monitor.query_metrics()
         self.assertTrue(result["needs_account"])
 
@@ -82,6 +82,47 @@ class DiscoveryTests(Isolated):
         self.assertEqual((alpha["stars"], alpha["status_text"], alpha["version"]), (3, "Listed & Verified", "1.0"))
         history = json.loads((monitor.get_state_dir() / "history.json").read_text())
         self.assertEqual(list(history["days"].values())[0]["ubruckhaus.alpha"], [10, 2, 1, 3])
+
+
+class DetectionTests(Isolated):
+    def test_gh_hosts_file(self):
+        gh = Path(os.environ["XDG_CONFIG_HOME"]) / "gh"
+        gh.mkdir(parents=True)
+        (gh / "hosts.yml").write_text("github.com:\n    git_protocol: https\n    users:\n        Some-User:\n    user: Some-User\n"
+                                      "gitlab.example:\n    user: other\n")
+        self.assertEqual(monitor.gh_config_user(), "Some-User")
+        (gh / "hosts.yml").write_text("github.com:\n    user: bad;name\n")
+        self.assertEqual(monitor.gh_config_user(), "")
+        (gh / "hosts.yml").write_text("enterprise.example:\n    user: someone\n")
+        self.assertEqual(monitor.gh_config_user(), "")
+
+    def test_noreply_email(self):
+        self.assertEqual(monitor.noreply_user("12345+uBruckhaus@users.noreply.github.com"), "uBruckhaus")
+        self.assertEqual(monitor.noreply_user("uBruckhaus@users.noreply.github.com"), "uBruckhaus")
+        for other in ("me@gmail.com", "x@users.noreply.github.com.evil", "", None):
+            self.assertEqual(monitor.noreply_user(other), "")
+
+    def test_installed_checkouts_count_only_own_plugin_ids(self):
+        home = Path(self.tmp.name) / "home"
+        def checkout(name, url):
+            git = home / ".config/omarchy/plugins" / name / ".git"
+            git.mkdir(parents=True)
+            (git / "config").write_text(f'[remote "origin"]\n\turl = {url}\n')
+        checkout("alice.one", "https://github.com/Alice/omarchy-one.git")
+        checkout("alice.two", "git@github.com:Alice/omarchy-two.git")
+        checkout("bob.three", "https://github.com/someone/three.git")   # someone else's plugin
+        checkout("plain", "https://github.com/Plain/plain.git")         # no plugin ID
+        with patch("pathlib.Path.home", return_value=home):
+            self.assertEqual(monitor.plugin_checkout_owners(), ["Alice"])
+
+    def test_detection_prefers_account_with_listed_plugins(self):
+        with patch("monitor.gh_config_user", return_value="workaccount"), patch("monitor.git_config", return_value=""), \
+             patch("monitor.plugin_checkout_owners", return_value=["uBruckhaus"]):
+            self.assertEqual(monitor.detect_account(CATALOG), ("uBruckhaus", "installed plugins"))
+            self.assertEqual(monitor.detect_account(), ("workaccount", "gh"))
+        with patch("monitor.gh_config_user", return_value=""), patch("monitor.gh_login", return_value=""), \
+             patch("monitor.git_config", return_value=""), patch("monitor.plugin_checkout_owners", return_value=[]):
+            self.assertEqual(monitor.detect_account(CATALOG), ("", ""))
 
 
 class HistoryTests(Isolated):
@@ -186,3 +227,35 @@ class HttpTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SafeguardTests(unittest.TestCase):
+    def test_bounded_runner_caps_output_and_time(self):
+        import time
+        self.assertEqual(monitor.run_bounded(["printf", "hello"], limit=100, timeout=5), (0, "hello"))
+        with self.assertRaises(ValueError):
+            monitor.run_bounded(["yes"], limit=64 * 1024, timeout=5)          # endless output
+        start = time.monotonic()
+        with self.assertRaises(TimeoutError):
+            monitor.run_bounded(["sleep", "30"], limit=1024, timeout=1)       # never answers
+        self.assertLess(time.monotonic() - start, 5)
+
+    def test_only_github_and_marketplace_links_open(self):
+        with patch("monitor.subprocess.Popen") as popen:
+            for bad in ("http://github.com/x", "https://evil.example/x", "https://github.com.evil.example/",
+                        "https://user:pw@github.com/x", "file:///etc/passwd", "javascript:alert(1)", "", None):
+                self.assertEqual(monitor.open_url(bad)["status"], "error", bad)
+            popen.assert_not_called()
+            self.assertEqual(monitor.open_url("https://github.com/uBruckhaus/x")["status"], "ok")
+            self.assertEqual(monitor.open_url("https://plugins.omarchy.org/plugin.html?id=a.b")["status"], "ok")
+
+    def test_redirects_are_refused(self):
+        class Redirect(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a): pass
+            def do_GET(self):
+                self.send_response(302); self.send_header("Location", "http://169.254.169.254/"); self.end_headers()
+        server = Server(("127.0.0.1", 0), Redirect)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.shutdown)
+        with self.assertRaises(Exception):
+            monitor.http_get(f"http://127.0.0.1:{server.server_address[1]}/", 1024, timeout=3)

@@ -16,6 +16,7 @@ ShellUi.BarWidget {
     property string author: ""
     property bool needsAccount: false
     property string accountMessage: ""
+    property string accountSource: ""
     property var history: ({})
     property var historyRequest: ({plugin: "all", metric: "views", range: "daily"})
     property int intervalMinutes: Math.max(1, Number(setting("intervalMinutes", 5)) || 5)
@@ -91,6 +92,7 @@ ShellUi.BarWidget {
             }
             if (data.status === "ok") {
                 if (data.author !== undefined) root.author = data.author
+                if (data.account_source !== undefined) root.accountSource = data.account_source
                 if (data.plugins !== undefined) root.plugins = data.plugins
                 if (data.total_views !== undefined) root.totalViews = data.total_views
                 if (data.total_downloads !== undefined) root.totalDownloads = data.total_downloads
@@ -214,6 +216,7 @@ ShellUi.BarWidget {
         sortOrder: root.sortOrder
         needsAccount: root.needsAccount
         accountMessage: root.accountMessage
+        accountSource: root.accountSource
         history: root.history
 
         onRefreshRequested: root.request({command: "query"})

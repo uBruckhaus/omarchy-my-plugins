@@ -1,9 +1,42 @@
 # My Plugins — Omarchy Plugin Marketplace Monitor
 
-A native Omarchy desktop shell bar widget and panel that monitors your published Omarchy plugins. Tracks live marketplace engagement metrics (views, command-copy downloads, hearts), GitHub repository stars, and publication/verification review statuses from the official [Omarchy Plugin Marketplace](https://plugins.omarchy.org/).
+A bar widget for Omarchy plugin developers. It finds your published plugins in the
+[Omarchy Plugin Marketplace](https://plugins.omarchy.org/) by your GitHub account and shows their
+views, downloads, hearts and GitHub stars, their review status, and a daily, weekly or monthly
+history chart. A pulsing dot on the bar icon tells you when something changed.
 
-> [!NOTE]
-> **Private Plugin**: This is a local author-monitoring plugin created specifically for your workflow. It is **not** published to the marketplace.
+## Install
+
+```sh
+omarchy plugin add https://github.com/uBruckhaus/omarchy-my-plugins.git
+omarchy plugin enable ubruckhaus.my-plugins
+```
+
+On first start My Plugins detects your GitHub account on this computer (the `gh` login, `git config
+github.user`, a GitHub no-reply e-mail, or your installed plugin checkouts) and shows where it came
+from; click the `@account ✎` badge to change it.
+
+**Requirements:** `python3` (standard library only). Optional: the GitHub CLI `gh`, logged in, for
+review status and live star counts; without it, stars come from the daily marketplace catalog and no
+review status is shown.
+
+## Remove
+
+```sh
+omarchy plugin disable ubruckhaus.my-plugins
+omarchy plugin remove ubruckhaus.my-plugins
+rm -r ~/.config/omarchy/my-plugins ~/.local/state/omarchy/my-plugins   # settings, cache and history (optional)
+```
+
+## Privacy and network
+
+My Plugins only reads public data: the marketplace catalog
+(`raw.githubusercontent.com/omacom/omarchy-plugin-marketplace/main/site/catalog.json`, cached and
+re-checked at most hourly), the marketplace stats API (`api.omarchyplugins.com/v1/stats`) and, through
+your own `gh` login, your repositories and your marketplace issues. Every download and helper output has
+a size cap and an overall deadline, redirects are refused, and links open only for `github.com` and
+`plugins.omarchy.org`. Nothing is sent anywhere; settings, the catalog cache and the history stay in
+`~/.config/omarchy/my-plugins` and `~/.local/state/omarchy/my-plugins`.
 
 ---
 
@@ -29,14 +62,13 @@ A native Omarchy desktop shell bar widget and panel that monitors your published
   - Default: **Views, Descending**.
   - Adjust anytime directly from the panel dropdowns or CLI.
 - **🚫 Published Only**:
-  - Only plugins with marketplace stats or a `[Plugin]`/`[Verify]` marketplace issue are listed; locally installed, unpublished plugins (e.g. Pellet Stove) are hidden.
+  - Only plugins listed in the marketplace catalog under your GitHub account are shown.
 - **📦 Version Display**:
-  - Each plugin card shows its current version from the installed manifest.
-  - When the latest GitHub release differs, it is shown alongside (e.g. `v0.3.0 · GH v0.3.3`) so installed-vs-published drift is visible at a glance.
+  - Each plugin card shows the version currently published in the marketplace.
 - **🎯 One-Click Deep Links**:
   - Jump directly to the plugin's Marketplace detail page (`https://plugins.omarchy.org/plugin.html?id=<plugin-id>`).
   - Open the GitHub repository.
-  - Track review/submission progress directly in GitHub Marketplace verification issues (e.g. #9889 for Simple Recipes, #9826 for Workspace Presets).
+  - Open the plugin's latest marketplace issue to follow a review.
 - **🔒 Omarchy Security Baseline**:
   - Non-truncating lock file acquisition (`os.O_NOFOLLOW | os.O_CREAT | os.O_RDWR`, mode `0600`).
   - Secure `$XDG_RUNTIME_DIR` ownership and permissions verification.

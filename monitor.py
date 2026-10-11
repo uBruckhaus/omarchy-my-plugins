@@ -181,6 +181,40 @@ ACCOUNT_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 REPO_RE = re.compile(r"^https://github\.com/([A-Za-z0-9-]{1,39})/([A-Za-z0-9._-]{1,100})/?$")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def run_bounded(args, limit=2 * 1024 * 1024, timeout=10):
+    """Run a helper (gh, git) with an output cap and one overall deadline: (returncode, text)."""
+    deadline = time.monotonic() + timeout
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+    chunks, size = [], 0
+    try:
+        os.set_blocking(proc.stdout.fileno(), False)
+        while True:
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"{args[0]} took too long")
+            try:
+                chunk = os.read(proc.stdout.fileno(), 65536)
+            except BlockingIOError:
+                time.sleep(0.02)
+                continue
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > limit:
+                raise ValueError(f"{args[0]} output too large")
+            chunks.append(chunk)
+        return proc.wait(timeout=max(0.1, deadline - time.monotonic())), b"".join(chunks).decode("utf-8", "replace")
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        proc.stdout.close()
+
+
 def http_get(url, limit, timeout=20, etag=None):
     """GET with a byte cap and one overall deadline. Returns (status, body, etag);
     status 304 means the cached copy is current. Raises ValueError on oversize/slow replies."""
@@ -190,7 +224,7 @@ def http_get(url, limit, timeout=20, etag=None):
         headers["If-None-Match"] = etag
     req = urllib.request.Request(url, headers=headers)
     try:
-        resp = urllib.request.urlopen(req, timeout=min(10, timeout))
+        resp = urllib.request.build_opener(_NoRedirect()).open(req, timeout=min(10, timeout))
     except urllib.error.HTTPError as error:
         if error.code == 304:
             return 304, b"", etag
@@ -225,19 +259,90 @@ def valid_account(account):
 def gh_login():
     """The GitHub account gh is logged into, used when no account is configured."""
     try:
-        res = subprocess.run(["gh", "api", "user", "--jq", ".login"], capture_output=True, text=True, timeout=6)
-        login = res.stdout.strip()[:64] if res.returncode == 0 else ""
+        code, out = run_bounded(["gh", "api", "user", "--jq", ".login"], limit=4096, timeout=6)
+        login = out.strip()[:64] if code == 0 else ""
         return login if valid_account(login) else ""
     except Exception:
         return ""
 
 
-def resolve_account(cfg, override=None):
-    """Configured GitHub account (owner of the plugin repositories), else the gh login."""
+def read_small(path, limit=64 * 1024):
+    try:
+        with open(path, "rb") as f:
+            return f.read(limit).decode("utf-8", "replace")
+    except OSError:
+        return ""
+
+
+def gh_config_user():
+    """The github.com user from gh's local config, without a network call."""
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    text = read_small(Path(os.environ.get("GH_CONFIG_DIR") or config_home / "gh") / "hosts.yml")
+    block = re.search(r"(?ms)^github\.com:\s*$(.*?)(?=^\S|\Z)", text)
+    match = re.search(r"(?m)^\s+user:\s*([A-Za-z0-9-]+)\s*$", block.group(1)) if block else None
+    return match.group(1) if match and valid_account(match.group(1)) else ""
+
+
+def git_config(key):
+    try:
+        code, out = run_bounded(["git", "config", "--global", "--get", key], limit=4096, timeout=3)
+        return out.strip()[:256] if code == 0 else ""
+    except Exception:
+        return ""
+
+
+def noreply_user(email):
+    match = re.match(r"^(?:\d+\+)?([A-Za-z0-9-]{1,39})@users\.noreply\.github\.com$", email or "")
+    return match.group(1) if match else ""
+
+
+def plugin_checkout_owners():
+    """Owners of installed plugin checkouts whose plugin ID prefix is the owner (one's own plugins)."""
+    owners = {}
+    root = Path.home() / ".config" / "omarchy" / "plugins"
+    for directory in sorted(root.iterdir()) if root.is_dir() else []:
+        if "." not in directory.name:
+            continue
+        text = read_small(directory / ".git" / "config")
+        match = re.search(r"url\s*=\s*(?:https://github\.com/|git@github\.com:)([A-Za-z0-9-]{1,39})/", text)
+        if match and match.group(1).lower() == directory.name.split(".")[0]:
+            owners[match.group(1)] = owners.get(match.group(1), 0) + 1
+    return sorted(owners, key=lambda o: -owners[o])
+
+
+def detect_account(catalog=None):
+    """Find the GitHub account on this computer for first setup: (account, source).
+    Prefers a candidate that owns listed plugins when the catalog is known."""
+    candidates = []
+    def add(login, source):
+        if valid_account(login) and login.lower() not in {c[0].lower() for c in candidates}:
+            candidates.append((login, source))
+    add(gh_config_user(), "gh")
+    if not candidates:
+        add(gh_login(), "gh")
+    add(git_config("github.user"), "git config github.user")
+    add(noreply_user(git_config("user.email")), "git e-mail")
+    for owner in plugin_checkout_owners():
+        add(owner, "installed plugins")
+    if catalog:
+        owners = {repo_owner(e.get("repo"))[0].lower() for e in catalog if repo_owner(e.get("repo"))[0]}
+        for login, source in candidates:
+            if login.lower() in owners:
+                return login, source
+    return candidates[0] if candidates else ("", "")
+
+
+def resolve_account(cfg, override=None, catalog=None):
+    """Configured GitHub account (owner of the plugin repositories), else one detected on this computer."""
+    account, _source = resolve_account_with_source(cfg, override, catalog)
+    return account
+
+
+def resolve_account_with_source(cfg, override=None, catalog=None):
     for candidate in (override, cfg.get("author")):
         if candidate and valid_account(str(candidate).strip()):
-            return str(candidate).strip()
-    return gh_login()
+            return str(candidate).strip(), "settings"
+    return detect_account(catalog)
 
 
 def repo_owner(url):
@@ -287,12 +392,13 @@ def fetch_catalog(state_dir=None, now=None):
 
 def fetch_marketplace_issues(account):
     try:
-        res = subprocess.run(
+        code, out = run_bounded(
             ["gh", "issue", "list", "--repo", "omacom/omarchy-plugin-marketplace", "--author", account, "--state", "all",
              "--limit", "200", "--json", "number,title,body,state,labels,createdAt,closedAt,updatedAt,url"],
-            capture_output=True, text=True, timeout=10)
-        if res.returncode == 0:
-            return json.loads(res.stdout)
+            limit=16 * 1024 * 1024, timeout=20)
+        if code == 0:
+            issues = json.loads(out)
+            return issues if isinstance(issues, list) else []
     except Exception as e:
         sys.stderr.write(f"Warning: Failed to fetch marketplace issues for '{account}': {e}\n")
     return []
@@ -301,10 +407,10 @@ def fetch_marketplace_issues(account):
 def fetch_github_repos(account):
     """Live star counts: {repo name: {stargazerCount, url, description}} (the catalog refreshes daily)."""
     try:
-        res = subprocess.run(["gh", "repo", "list", account, "--limit", "300", "--json", "name,description,stargazerCount,url"],
-                             capture_output=True, text=True, timeout=10)
-        if res.returncode == 0:
-            return {r["name"]: r for r in json.loads(res.stdout)}
+        code, out = run_bounded(["gh", "repo", "list", account, "--limit", "300", "--json", "name,description,stargazerCount,url"],
+                                limit=4 * 1024 * 1024, timeout=20)
+        if code == 0:
+            return {r["name"]: r for r in json.loads(out) if isinstance(r, dict) and isinstance(r.get("name"), str)}
     except Exception as e:
         sys.stderr.write(f"Warning: Failed to fetch GitHub repos for '{account}': {e}\n")
     return {}
@@ -399,13 +505,13 @@ def query_metrics(author=None):
 
     cfg = load_config()
     interval = cfg.get("interval_minutes", 5)
-    author = resolve_account(cfg, author)
+    catalog = fetch_catalog(state_dir)
+    author, account_source = resolve_account_with_source(cfg, author, catalog)
     if not author:
         return {"status": "error", "author": "", "needs_account": True, "plugins": [],
                 "message": "Enter your GitHub account: the owner of your plugin repositories."}
 
     stats = fetch_marketplace_stats()
-    catalog = fetch_catalog(state_dir)
     issues = fetch_marketplace_issues(author)
     repos = fetch_github_repos(author)
     tracked = discover_plugins(author, catalog, issues)
@@ -522,6 +628,7 @@ def query_metrics(author=None):
     result = {
         "status": "ok",
         "author": author,
+        "account_source": account_source,
         "last_updated": now_iso,
         "interval_minutes": interval,
         "has_changes": has_changes,
@@ -745,7 +852,7 @@ def set_author(author):
             cfg = load_config()
             cfg["author"] = ""
             save_config(cfg)
-            return {"status": "ok", "author": gh_login()}
+            return {"status": "ok", "author": detect_account()[0]}
         if not valid_account(a):
             return {"status": "error", "message": "Enter a GitHub account name (letters, digits and hyphens)."}
         cfg = load_config()
@@ -755,8 +862,14 @@ def set_author(author):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+OPEN_HOSTS = ("github.com", "plugins.omarchy.org")
+
+
 def open_url(url):
-    if not url or not (url.startswith("https://") or url.startswith("http://")):
+    """Open only https links to GitHub or the marketplace site (links come from catalog data)."""
+    import urllib.parse
+    parts = urllib.parse.urlsplit(str(url or ""))
+    if parts.scheme != "https" or parts.hostname not in OPEN_HOSTS or parts.username or parts.password or len(str(url)) > 2048:
         return {"status": "error", "message": "invalid url"}
     try:
         subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
