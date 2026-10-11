@@ -92,7 +92,7 @@ an overall deadline.
 ## History
 
 Each refresh stores one snapshot per day (views, downloads, hearts and stars for every plugin) in
-`~/.local/state/omarchy/my-plugins/history.json`, kept for 400 days. The **History** card shows the
+`~/.local/state/omarchy/my-plugins/history.json`, kept for 400 days. The **📈 History** page (button on the main page; Backspace or Back returns) shows the
 gains per day (30 days), week (12 weeks) or month (12 months) for one plugin or all of them; hover a
 bar for its value and running total. The marketplace keeps no history itself, so the chart starts on
 the day My Plugins first runs.
