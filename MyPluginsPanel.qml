@@ -189,16 +189,6 @@ Ui.Panel {
                             tooltipText: root.t("settings")
                             onClicked: root.settingsOpen = true
                         }
-
-                        Ui.Button {
-                            implicitHeight: Style.space(26)
-                            tooltipText: root.t("closeTip")
-                            text: "✕"
-                            fontSize: Style.font.caption
-                            bordered: true
-                            focusable: true
-                            onClicked: root.close()
-                        }
                     }
                 }
 
