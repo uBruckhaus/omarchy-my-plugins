@@ -5,6 +5,12 @@ A bar widget for Omarchy plugin developers. It finds your published plugins in t
 views, downloads, hearts and GitHub stars, their review status, and a daily, weekly or monthly
 history chart. A pulsing dot on the bar icon tells you when something changed.
 
+## Languages and settings
+
+The interface is built in in eight languages: English, German (Deutsch), French (Français), Spanish (Español), Italian (Italiano), Portuguese (Português), Dutch (Nederlands) and Polish (Polski). It follows the system language (`LC_ALL`, `LC_MESSAGES`, `LANG`) and falls back to English. To pick another one, open the **gear (⚙)** at the top right of the panel → **Language**. The translations ship with the plugin: nothing is downloaded or generated, and the plugin makes no extra requests for them. The choice is stored in the widget's own entry in `~/.config/omarchy/shell.json` (`"language"`); **System (…)** removes it again.
+
+The settings page opens from the gear and closes with **← Back**, Backspace or Esc. It also holds the **check interval** and the **GitHub account** whose plugins are shown, which used to be in the main panel. The history page has the same **← Back** header.
+
 ## Install
 
 ```sh

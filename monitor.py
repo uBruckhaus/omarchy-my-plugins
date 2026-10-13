@@ -509,7 +509,8 @@ def query_metrics(author=None):
     author, account_source = resolve_account_with_source(cfg, author, catalog)
     if not author:
         return {"status": "error", "author": "", "needs_account": True, "plugins": [],
-                "message": "Enter your GitHub account: the owner of your plugin repositories."}
+                "message": "Enter your GitHub account: the owner of your plugin repositories.",
+                "message_code": "accountNeeded"}
 
     stats = fetch_marketplace_stats()
     issues = fetch_marketplace_issues(author)
@@ -696,7 +697,7 @@ def read_clipboard():
             return {"status": "ok", "clipboard": ""}
         code, text = run_bounded(["wl-paste", "--no-newline", "--type", mime], limit=4096, timeout=2)
     except (OSError, ValueError, TimeoutError):
-        return {"status": "error", "message": "Clipboard text is too long or did not answer in time."}
+        return {"status": "error", "message": "Clipboard text is too long or did not answer in time.", "message_code": "clipboardTooLong"}
     text = text if code == 0 else ""
     return {"status": "ok", "clipboard": "".join(c for c in text if c >= " " and c != "\x7f")}
 
@@ -880,7 +881,7 @@ def set_author(author):
             save_config(cfg)
             return {"status": "ok", "author": detect_account()[0]}
         if not valid_account(a):
-            return {"status": "error", "message": "Enter a GitHub account name (letters, digits and hyphens)."}
+            return {"status": "error", "message": "Enter a GitHub account name (letters, digits and hyphens).", "message_code": "accountInvalid"}
         cfg = load_config()
         cfg["author"] = a
         save_config(cfg)

@@ -3,6 +3,7 @@ import QtQuick.Controls as Controls
 import Quickshell
 import "native/Commons"
 import "native/Ui" as Ui
+import "I18n.js" as I18n
 
 Ui.Panel {
     id: root
@@ -16,8 +17,18 @@ Ui.Panel {
     property bool needsAccount: false
     property string accountMessage: ""
     property string accountSource: ""
-    property bool editAccount: false
     property bool showHistory: false
+    // Settings page (gear in the header). Back with the button, Backspace or Esc.
+    property bool settingsOpen: false
+    readonly property string lang: hostWidget ? hostWidget.lang : "en"
+    readonly property string languageSetting: hostWidget ? hostWidget.languageSetting : "auto"
+    readonly property string systemLang: hostWidget ? hostWidget.systemLang : "en"
+    function t(key, args) { return I18n.tr(lang, key, args) }
+    function tn(key, n, args) { return I18n.trn(lang, key, n, args) }
+    onSettingsOpenChanged: { panelScroll.contentY = 0; if (settingsOpen) showHistory = false; content.forceActiveFocus() }
+    // Without an account there is nothing to show: start on the settings page.
+    onNeedsAccountChanged: if (needsAccount) settingsOpen = true
+    function back() { if (settingsOpen) settingsOpen = false; else showHistory = false; content.forceActiveFocus() }
     property bool confirmClearHistory: false
     property var history: ({})
     property string historyMetric: "views"
@@ -52,11 +63,11 @@ Ui.Panel {
     function pasteIntoAccount(text) { accountField.insert(text) }
 
     function reloadHistory() { historyRequested(historyPlugin, historyMetric, historyRange) }
-    onOpenedChanged: if (opened) reloadHistory(); else showHistory = false
+    onOpenedChanged: if (opened) { reloadHistory(); if (needsAccount) settingsOpen = true } else { showHistory = false; settingsOpen = false }
     onShowHistoryChanged: { panelScroll.contentY = 0; confirmClearHistory = false; if (showHistory) reloadHistory() }
 
     function formatTime(isoString) {
-        if (!isoString) return "Never"
+        if (!isoString) return t("never")
         try {
             var d = new Date(isoString)
             if (isNaN(d.getTime())) return isoString
@@ -94,10 +105,10 @@ Ui.Panel {
                 width: parent.width
                 focus: root.opened
                 spacing: Style.space(12)
-                Keys.onEscapePressed: root.close()
-                // Backspace returns from the history page (text fields keep their own Backspace).
+                // Esc and Backspace leave the history or settings page first (text fields keep their own Backspace).
+                Keys.onEscapePressed: { if (root.showHistory || root.settingsOpen) root.back(); else root.close() }
                 Keys.onPressed: function(event) {
-                    if (event.key === Qt.Key_Backspace && root.showHistory) { root.showHistory = false; content.forceActiveFocus(); event.accepted = true }
+                    if (event.key === Qt.Key_Backspace && (root.showHistory || root.settingsOpen)) { root.back(); event.accepted = true }
                 }
 
                 // Header
@@ -134,17 +145,17 @@ Ui.Panel {
                                     Text { textFormat: Text.PlainText;
                                         id: authorBadgeText
                                         anchors.centerIn: parent
-                                        text: root.author ? "@" + root.author + " ✎" : "set account ✎"
+                                        text: root.author ? "@" + root.author + " ✎" : root.t("setAccount") + " ✎"
                                         color: Color.accent
                                         font.family: Style.font.family
                                         font.pixelSize: Style.font.caption - 1
                                         font.bold: true
-                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.editAccount = !root.editAccount }
+                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.settingsOpen = true }
                                 }
                                 }
                             }
                             Text { textFormat: Text.PlainText;
-                                text: "Omarchy Marketplace & GitHub Monitor"
+                                text: root.t("subtitle")
                                 color: Color.foreground
                                 opacity: 0.6
                                 font.family: Style.font.family
@@ -160,7 +171,7 @@ Ui.Panel {
 
                         Ui.Button {
                             implicitHeight: Style.space(26)
-                            text: root.isQuerying ? "Checking..." : "↻ Refresh"
+                            text: root.isQuerying ? root.t("checking") : "↻ " + root.t("refresh")
                             fontSize: Style.font.caption
                             bordered: true
                             focusable: true
@@ -169,7 +180,19 @@ Ui.Panel {
                         }
 
                         Ui.Button {
+                            visible: !root.settingsOpen
                             implicitHeight: Style.space(26)
+                            text: "\udb81\udc93"
+                            fontSize: Style.font.caption
+                            bordered: true
+                            focusable: true
+                            tooltipText: root.t("settings")
+                            onClicked: root.settingsOpen = true
+                        }
+
+                        Ui.Button {
+                            implicitHeight: Style.space(26)
+                            tooltipText: root.t("closeTip")
                             text: "✕"
                             fontSize: Style.font.caption
                             bordered: true
@@ -179,12 +202,113 @@ Ui.Panel {
                     }
                 }
 
+                // Settings page: language, check interval, GitHub account.
+                Column {
+                    width: parent.width
+                    spacing: Style.space(12)
+                    visible: root.settingsOpen
+                    Row {
+                        spacing: Style.space(12)
+                        Ui.Button { focusable: true; bordered: true; iconText: "\udb80\udc4d"; text: root.t("back") + " · \u232b"; tooltipText: root.t("backTip"); onClicked: root.back(); anchors.verticalCenter: parent.verticalCenter }
+                        Text { textFormat: Text.PlainText; text: root.t("settings").toUpperCase(); color: Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter }
+                    }
+                    Ui.PanelSeparator { width: parent.width }
+                    Row {
+                        spacing: Style.space(10)
+                        Text { id: languageLabel; textFormat: Text.PlainText; width: Style.space(90); text: root.t("language"); color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; anchors.verticalCenter: parent.verticalCenter }
+                        CompactDropdown {
+                            id: languagePicker
+                            anchors.verticalCenter: parent.verticalCenter
+                            showLabel: false
+                            // Wide enough for the longest option, plus padding and the chevron.
+                            width: fitWidth
+                            fontSize: Style.font.caption
+                            rowHeight: languageLabel.implicitHeight + Style.space(6)
+                            popupRowHeight: languageLabel.implicitHeight + Style.space(8)
+                            options: [{ value: "auto", label: root.t("systemLanguage", [I18n.languageName(root.systemLang)]) }]
+                                .concat(I18n.LANGUAGES.map(function(l) { return { value: l.code, label: l.name } }))
+                            value: root.languageSetting
+                            // Picking cuts the value binding inside the dropdown; restore it.
+                            onChanged: function(picked) {
+                                if (root.hostWidget) root.hostWidget.setLanguage(picked)
+                                languagePicker.value = Qt.binding(function() { return root.languageSetting })
+                            }
+                        }
+                    }
+                    // Query Interval Configuration Strip
+                    Rectangle {
+                        width: parent.width
+                        height: Style.space(42)
+                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                        border.width: 1
+                        border.color: Color.popups.border
+
+                        Item {
+                            anchors.fill: parent
+                            anchors.margins: Style.space(6)
+
+                            Row {
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: Style.space(6)
+
+                                Text { textFormat: Text.PlainText;
+                                    text: root.t("interval")
+                                    color: Color.foreground
+                                    opacity: 0.8
+                                    font.pixelSize: Style.font.caption
+                                }
+
+                                Repeater {
+                                    model: [1, 2, 5, 10, 15, 30, 60]
+                                    delegate: Ui.Button {
+                                        implicitHeight: Style.space(24)
+                                        implicitWidth: Style.space(32)
+                                        text: modelData + "m"
+                                        fontSize: Style.font.caption
+                                        bordered: true
+                                        focusable: true
+                                        selected: root.intervalMinutes === modelData
+                                        onClicked: root.intervalSelected(modelData)
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                    // GitHub account whose marketplace plugins are shown
+                    Rectangle {
+                        width: parent.width
+                        height: accountColumn.implicitHeight + Style.space(16)
+                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08)
+                        border.width: 1
+                        border.color: Color.accent
+                        Column {
+                            id: accountColumn
+                            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
+                            spacing: Style.space(6)
+                            Text { textFormat: Text.PlainText; width: parent.width; text: root.t("githubAccount"); color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
+                            Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.t("accountHelp"); color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                            Row {
+                                width: parent.width; spacing: Style.space(6)
+                                Ui.TextField { id: accountField; pasteHandler: function(field) { root.pasteRequested() }; width: parent.width - saveAccount.width - Style.space(6); text: root.author; placeholderText: root.t("accountPlaceholder"); onAccepted: root.accountSubmitted(text.trim()) }
+                                Ui.Button { id: saveAccount; focusable: true; bordered: true; text: root.t("save"); onClicked: root.accountSubmitted(accountField.text.trim()) }
+                            }
+                            Text { width: parent.width; visible: root.author !== "" && root.accountSource !== "" && root.accountSource !== "settings"; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.t("usingDetected", [root.author, root.accountSource]); color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                            Text { width: parent.width; visible: root.accountMessage !== ""; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.hostWidget ? root.hostWidget.msgText(root.accountMessage) : root.accountMessage; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                        }
+                    }
+
+                }
+
                 // Changes Notification Banner (if changes detected)
                 // Main page
                 Column {
                     width: parent.width
                     spacing: Style.space(12)
-                    visible: !root.showHistory
+                    visible: !root.showHistory && !root.settingsOpen
                     Rectangle {
                         width: parent.width
                         height: bannerCol.implicitHeight + Style.space(16)
@@ -216,7 +340,7 @@ Ui.Panel {
                                     }
 
                                     Text { textFormat: Text.PlainText;
-                                        text: "New updates detected!"
+                                        text: root.t("newUpdates")
                                         color: Color.accent
                                         font.pixelSize: Style.font.body
                                         anchors.verticalCenter: parent.verticalCenter
@@ -227,7 +351,7 @@ Ui.Panel {
                                     anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
                                     implicitHeight: Style.space(22)
-                                    text: "✓ Mark as Read"
+                                    text: "✓ " + root.t("markRead")
                                     fontSize: Style.font.caption
                                     bordered: true
                                     focusable: true
@@ -237,7 +361,7 @@ Ui.Panel {
 
                             Text { textFormat: Text.PlainText;
                                 width: parent.width
-                                text: root.changesSummary !== "" ? root.changesSummary : "Metrics or status updated in latest query."
+                                text: root.changesSummary !== "" ? root.changesSummary : root.t("metricsUpdated")
                                 color: Color.foreground
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.caption
@@ -264,7 +388,7 @@ Ui.Panel {
                                 anchors.centerIn: parent
                                 spacing: Style.space(2)
                                 Text { textFormat: Text.PlainText;
-                                    text: "👁 Views"
+                                    text: "👁 " + root.t("views")
                                     color: Color.foreground
                                     opacity: 0.65
                                     font.pixelSize: Style.font.caption
@@ -293,7 +417,7 @@ Ui.Panel {
                                 anchors.centerIn: parent
                                 spacing: Style.space(2)
                                 Text { textFormat: Text.PlainText;
-                                    text: "📥 Downloads"
+                                    text: "📥 " + root.t("downloads")
                                     color: Color.foreground
                                     opacity: 0.65
                                     font.pixelSize: Style.font.caption
@@ -322,7 +446,7 @@ Ui.Panel {
                                 anchors.centerIn: parent
                                 spacing: Style.space(2)
                                 Text { textFormat: Text.PlainText;
-                                    text: "❤️ Hearts"
+                                    text: "❤️ " + root.t("hearts")
                                     color: Color.foreground
                                     opacity: 0.65
                                     font.pixelSize: Style.font.caption
@@ -351,7 +475,7 @@ Ui.Panel {
                                 anchors.centerIn: parent
                                 spacing: Style.space(2)
                                 Text { textFormat: Text.PlainText;
-                                    text: "⭐ GH Stars"
+                                    text: "⭐ " + root.t("ghStars")
                                     color: Color.foreground
                                     opacity: 0.65
                                     font.pixelSize: Style.font.caption
@@ -368,82 +492,9 @@ Ui.Panel {
                         }
                     }
 
-                    // Query Interval Configuration Strip
-                    Rectangle {
-                        width: parent.width
-                        height: Style.space(42)
-                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
-                        border.width: 1
-                        border.color: Color.popups.border
-
-                        Item {
-                            anchors.fill: parent
-                            anchors.margins: Style.space(6)
-
-                            Row {
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: Style.space(6)
-
-                                Text { textFormat: Text.PlainText;
-                                    text: "Interval:"
-                                    color: Color.foreground
-                                    opacity: 0.8
-                                    font.pixelSize: Style.font.caption
-                                }
-
-                                Repeater {
-                                    model: [1, 2, 5, 10, 15, 30, 60]
-                                    delegate: Ui.Button {
-                                        implicitHeight: Style.space(24)
-                                        implicitWidth: Style.space(32)
-                                        text: modelData + "m"
-                                        fontSize: Style.font.caption
-                                        bordered: true
-                                        focusable: true
-                                        selected: root.intervalMinutes === modelData
-                                        onClicked: root.intervalSelected(modelData)
-                                    }
-                                }
-                            }
-
-                            Text { textFormat: Text.PlainText;
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Updated: " + root.formatTime(root.lastUpdatedText)
-                                color: Color.foreground
-                                opacity: 0.55
-                                font.pixelSize: Style.font.caption
-                            }
-                        }
-                    }
-                    Ui.Button { focusable: true; width: parent.width; bordered: true; text: "📈  History · daily, weekly, monthly"; onClicked: root.showHistory = true }
-
-                    // GitHub account whose marketplace plugins are shown
-                    Rectangle {
-                        width: parent.width
-                        visible: root.editAccount || root.needsAccount
-                        height: visible ? accountColumn.implicitHeight + Style.space(16) : 0
-                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08)
-                        border.width: 1
-                        border.color: Color.accent
-                        Column {
-                            id: accountColumn
-                            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
-                            spacing: Style.space(6)
-                            Text { textFormat: Text.PlainText; width: parent.width; text: "GitHub account"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
-                            Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Plugins are found in the marketplace catalog by repository owner: for github.com/uBruckhaus/omarchy-theme-manager the account is uBruckhaus. Leave it empty to use the account detected on this computer (gh login, git settings or your installed plugins)."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
-                            Row {
-                                width: parent.width; spacing: Style.space(6)
-                                Ui.TextField { id: accountField; pasteHandler: function(field) { root.pasteRequested() }; width: parent.width - saveAccount.width - Style.space(6); text: root.author; placeholderText: "GitHub account, e.g. uBruckhaus"; onAccepted: root.accountSubmitted(text.trim()) }
-                                Ui.Button { id: saveAccount; focusable: true; bordered: true; text: "Save"; onClicked: { root.accountSubmitted(accountField.text.trim()); root.editAccount = false } }
-                            }
-                            Text { width: parent.width; visible: root.author !== "" && root.accountSource !== "" && root.accountSource !== "settings"; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: "Using @" + root.author + ", detected from " + root.accountSource + " on this computer. Save to keep it, or enter another account."; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
-                            Text { width: parent.width; visible: root.accountMessage !== ""; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.accountMessage; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.caption }
-                        }
-                    }
+                    Text { textFormat: Text.PlainText; anchors.right: parent.right
+                        text: root.t("updatedAt", [root.formatTime(root.lastUpdatedText)]); color: Color.foreground; opacity: 0.55; font.pixelSize: Style.font.caption }
+                    Ui.Button { focusable: true; width: parent.width; bordered: true; text: "📈  " + root.t("historyButton"); onClicked: root.showHistory = true }
 
                     // History of views, downloads, hearts and stars
 
@@ -467,7 +518,7 @@ Ui.Panel {
                             spacing: Style.space(10)
 
                             Text { textFormat: Text.PlainText;
-                                text: "Sort:"
+                                text: root.t("sort")
                                 color: Color.foreground
                                 opacity: 0.8
                                 font.pixelSize: Style.font.caption
@@ -480,12 +531,12 @@ Ui.Panel {
                                 width: Style.space(150)
                                 value: root.sortBy
                                 options: [
-                                    { value: "views", label: "👁 Views" },
-                                    { value: "downloads", label: "📥 Downloads" },
-                                    { value: "hearts", label: "❤️ Hearts" },
-                                    { value: "stars", label: "⭐ GitHub Stars" },
-                                    { value: "name", label: "🔤 Name" },
-                                    { value: "date", label: "📅 Publish Date" }
+                                    { value: "views", label: "👁 " + root.t("views") },
+                                    { value: "downloads", label: "📥 " + root.t("downloads") },
+                                    { value: "hearts", label: "❤️ " + root.t("hearts") },
+                                    { value: "stars", label: "⭐ " + root.t("githubStars") },
+                                    { value: "name", label: "🔤 " + root.t("sortName") },
+                                    { value: "date", label: "📅 " + root.t("sortDate") }
                                 ]
                                 onChanged: function(v) { root.sortChanged(v, root.sortOrder) }
                             }
@@ -496,8 +547,8 @@ Ui.Panel {
                                 width: Style.space(120)
                                 value: root.sortOrder
                                 options: [
-                                    { value: "desc", label: "↓ Descending" },
-                                    { value: "asc", label: "↑ Ascending" }
+                                    { value: "desc", label: "↓ " + root.t("descending") },
+                                    { value: "asc", label: "↑ " + root.t("ascending") }
                                 ]
                                 onChanged: function(v) { root.sortChanged(root.sortBy, v) }
                             }
@@ -506,7 +557,7 @@ Ui.Panel {
 
                     // Section Divider
                     Ui.PanelSectionHeader {
-                        text: "Published Plugins by @" + (root.author || "?") + " (" + root.plugins.length + ")"
+                        text: root.t("publishedBy", [root.author || "?", root.plugins.length])
                     }
 
                     // Table Column Headers
@@ -522,7 +573,7 @@ Ui.Panel {
 
                             Text { textFormat: Text.PlainText;
                                 width: Style.space(92)
-                                text: "PUBLISHED"
+                                text: root.t("colPublished").toUpperCase()
                                 color: Color.foreground
                                 opacity: 0.5
                                 font.family: Style.font.family
@@ -532,7 +583,7 @@ Ui.Panel {
 
                             Text { textFormat: Text.PlainText;
                                 width: Style.space(150)
-                                text: "PLUGIN"
+                                text: root.t("colPlugin").toUpperCase()
                                 color: Color.foreground
                                 opacity: 0.5
                                 font.family: Style.font.family
@@ -541,7 +592,7 @@ Ui.Panel {
                             }
 
                             Text { textFormat: Text.PlainText;
-                                text: "STATUS / VERIFICATION"
+                                text: root.t("colStatus").toUpperCase()
                                 color: Color.foreground
                                 opacity: 0.5
                                 font.family: Style.font.family
@@ -663,7 +714,7 @@ Ui.Panel {
                                             Text { textFormat: Text.PlainText;
                                                 id: statusText
                                                 anchors.centerIn: parent
-                                                text: modelData.status_text
+                                                text: root.hostWidget ? root.hostWidget.statusName(modelData.status_code, modelData.status_text) : modelData.status_text
                                                 font.pixelSize: Style.font.caption - 1
                                                 font.bold: true
                                                 color: {
@@ -702,7 +753,7 @@ Ui.Panel {
                                     // GitHub release alongside when it differs.
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "📦 Ver:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "📦 " + root.t("ver") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
                                         Text { textFormat: Text.PlainText;
                                             text: {
                                                 var v = modelData.local_version || modelData.release_version || ""
@@ -722,7 +773,7 @@ Ui.Panel {
                                     // Views
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "👁 Views:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "👁 " + root.t("views") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
                                         Text { textFormat: Text.PlainText; text: String(modelData.views); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                         Rectangle {
                                             visible: modelData.views_delta > 0
@@ -744,7 +795,7 @@ Ui.Panel {
                                     // Downloads
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "📥 Copies:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "📥 " + root.t("copies") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
                                         Text { textFormat: Text.PlainText; text: String(modelData.downloads); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                         Rectangle {
                                             visible: modelData.downloads_delta > 0
@@ -766,14 +817,14 @@ Ui.Panel {
                                     // Hearts
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "❤️ Hearts:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "❤️ " + root.t("hearts") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
                                         Text { textFormat: Text.PlainText; text: String(modelData.hearts); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                     }
 
                                     // Stars
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "⭐ GH Stars:"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "⭐ " + root.t("ghStars") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
                                         Text { textFormat: Text.PlainText; text: String(modelData.stars); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                     }
                                 }
@@ -785,7 +836,7 @@ Ui.Panel {
 
                                     Ui.Button {
                                         implicitHeight: Style.space(22)
-                                        text: "🛒 Marketplace"
+                                        text: "🛒 " + root.t("marketplace")
                                         fontSize: Style.font.caption - 1
                                         bordered: true
                                         focusable: true
@@ -794,7 +845,7 @@ Ui.Panel {
 
                                     Ui.Button {
                                         implicitHeight: Style.space(22)
-                                        text: "🐙 GitHub Repo"
+                                        text: "🐙 " + root.t("githubRepo")
                                         fontSize: Style.font.caption - 1
                                         bordered: true
                                         focusable: true
@@ -804,7 +855,7 @@ Ui.Panel {
                                     Ui.Button {
                                         visible: modelData.issue_url !== null
                                         implicitHeight: Style.space(22)
-                                        text: "📋 Marketplace Issue"
+                                        text: "📋 " + root.t("marketplaceIssue")
                                         fontSize: Style.font.caption - 1
                                         bordered: true
                                         focusable: true
@@ -819,8 +870,12 @@ Ui.Panel {
                 Column {
                     width: parent.width
                     spacing: Style.space(12)
-                    visible: root.showHistory
-                    Ui.Button { focusable: true; width: parent.width; bordered: true; text: "← Back to My Plugins · ⌫"; onClicked: root.showHistory = false }
+                    visible: root.showHistory && !root.settingsOpen
+                    Row {
+                        spacing: Style.space(12)
+                        Ui.Button { focusable: true; bordered: true; iconText: "\udb80\udc4d"; text: root.t("back") + " · \u232b"; tooltipText: root.t("backTip"); onClicked: root.back(); anchors.verticalCenter: parent.verticalCenter }
+                        Text { textFormat: Text.PlainText; text: root.t("history").toUpperCase(); color: Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter }
+                    }
                     Rectangle {
                         width: parent.width
                         height: historyColumn.implicitHeight + Style.space(16)
@@ -834,22 +889,22 @@ Ui.Panel {
                             spacing: Style.space(8)
                             Row {
                                 width: parent.width; spacing: Style.space(8)
-                                Text { textFormat: Text.PlainText; text: "📈 History"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
+                                Text { textFormat: Text.PlainText; text: "📈 " + root.t("history"); color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
                                 Text { textFormat: Text.PlainText; anchors.verticalCenter: parent.verticalCenter; color: Color.foreground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption
                                        text: root.hoveredBar >= 0 && root.historyValues[root.hoveredBar] !== null
-                                             ? (root.history.labels || [])[root.hoveredBar] + ": +" + root.historyValues[root.hoveredBar] + " (" + (root.history.totals || [])[root.hoveredBar] + " total)"
-                                             : "+" + root.historyGain + " in this range" }
+                                             ? root.t("hoverValue", [(root.history.labels || [])[root.hoveredBar], root.historyValues[root.hoveredBar], (root.history.totals || [])[root.hoveredBar]])
+                                             : root.t("inRange", [root.historyGain]) }
                             }
                             Row {
                                 width: parent.width; spacing: Style.space(6)
                                 Ui.Dropdown { showLabel: false; width: (parent.width - Style.space(12)) / 3; value: root.historyMetric
-                                    options: [{value: "views", label: "👁 Views"}, {value: "downloads", label: "📥 Downloads"}, {value: "hearts", label: "❤️ Hearts"}, {value: "stars", label: "⭐ Stars"}]
+                                    options: [{value: "views", label: "👁 " + root.t("views")}, {value: "downloads", label: "📥 " + root.t("downloads")}, {value: "hearts", label: "❤️ " + root.t("hearts")}, {value: "stars", label: "⭐ " + root.t("stars")}]
                                     onChanged: function(v) { root.historyMetric = v; root.reloadHistory() } }
                                 Ui.Dropdown { showLabel: false; width: (parent.width - Style.space(12)) / 3; value: root.historyRange
-                                    options: [{value: "daily", label: "Daily · 30 days"}, {value: "weekly", label: "Weekly · 12 weeks"}, {value: "monthly", label: "Monthly · 12 months"}]
+                                    options: [{value: "daily", label: root.t("daily")}, {value: "weekly", label: root.t("weekly")}, {value: "monthly", label: root.t("monthly")}]
                                     onChanged: function(v) { root.historyRange = v; root.reloadHistory() } }
                                 Ui.Dropdown { showLabel: false; width: (parent.width - Style.space(12)) / 3; value: root.historyPlugin
-                                    options: [{value: "all", label: "All plugins"}].concat(root.plugins.map(function(p) { return {value: p.id, label: p.name} }))
+                                    options: [{value: "all", label: root.t("allPlugins")}].concat(root.plugins.map(function(p) { return {value: p.id, label: p.name} }))
                                     onChanged: function(v) { root.historyPlugin = v; root.reloadHistory() } }
                             }
                             Item {
@@ -888,12 +943,12 @@ Ui.Panel {
                                 }
                             }
                             Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1
-                                   text: root.history.first_day ? "Gains per " + (root.historyRange === "daily" ? "day" : root.historyRange === "weekly" ? "week" : "month") + ". Recorded since " + root.history.first_day + "; the marketplace keeps no history, so earlier periods stay empty."
-                                                                : "History starts with the first refresh: one snapshot per day is kept for 400 days." }
+                                   text: root.history.first_day ? root.t(root.historyRange === "daily" ? "gainsDay" : root.historyRange === "weekly" ? "gainsWeek" : "gainsMonth", [root.history.first_day])
+                                                                : root.t("historyStarts") }
                         }
                     }
                     // Clear history, with an in-place confirmation
-                    Ui.Button { focusable: true; visible: !root.confirmClearHistory; bordered: true; text: "🗑  Clear history…"; onClicked: root.confirmClearHistory = true }
+                    Ui.Button { focusable: true; visible: !root.confirmClearHistory; bordered: true; text: "🗑  " + root.t("clearHistory"); onClicked: root.confirmClearHistory = true }
                     Rectangle {
                         width: parent.width
                         visible: root.confirmClearHistory
@@ -907,15 +962,14 @@ Ui.Panel {
                             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
                             spacing: Style.space(6)
                             Text { textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap; color: Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption
-                                   text: "Delete all recorded history" + (root.history.first_day ? " (since " + root.history.first_day + ")" : "") + " for all plugins? This cannot be undone. Recording starts again with the next refresh." }
+                                   text: root.history.first_day ? root.t("confirmClearSince", [root.history.first_day]) : root.t("confirmClear") }
                             Row {
                                 spacing: Style.space(6)
-                                Ui.Button { focusable: true; bordered: true; text: "Delete history"; onClicked: { root.confirmClearHistory = false; root.clearHistoryRequested(root.historyPlugin, root.historyMetric, root.historyRange) } }
-                                Ui.Button { focusable: true; bordered: true; text: "Cancel"; onClicked: root.confirmClearHistory = false }
+                                Ui.Button { focusable: true; bordered: true; text: root.t("deleteHistory"); onClicked: { root.confirmClearHistory = false; root.clearHistoryRequested(root.historyPlugin, root.historyMetric, root.historyRange) } }
+                                Ui.Button { focusable: true; bordered: true; text: root.t("cancel"); onClicked: root.confirmClearHistory = false }
                             }
                         }
                     }
-                    Ui.Button { focusable: true; width: parent.width; bordered: true; text: "← Back to My Plugins · ⌫"; onClicked: root.showHistory = false }
                 }
             }
         }

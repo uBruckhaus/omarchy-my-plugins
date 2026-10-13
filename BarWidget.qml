@@ -5,6 +5,7 @@ import Quickshell.Io
 import "native/Commons"
 import "native/Ui" as Ui
 import qs.Ui as ShellUi
+import "I18n.js" as I18n
 
 ShellUi.BarWidget {
     id: root
@@ -12,6 +13,45 @@ ShellUi.BarWidget {
 
     property bool opened: panel.opened
     property bool popoutSwitchClosing: panel.popoutSwitchClosing
+
+    // Interface language: the system's unless one is picked in the panel's
+    // settings (stored in this widget's own shell.json entry).
+    readonly property string systemLang: I18n.systemLanguage(Quickshell.env("LC_ALL"), Quickshell.env("LC_MESSAGES"), Quickshell.env("LANG"))
+    readonly property string languageSetting: String(root.setting("language", "auto"))
+    readonly property string lang: I18n.resolve(languageSetting, systemLang)
+    function t(key, args) { return I18n.tr(lang, key, args) }
+    function tn(key, n, args) { return I18n.trn(lang, key, n, args) }
+    function setLanguage(code) {
+      if (!root.bar || !root.bar.shell || typeof root.bar.shell.updateEntryInline !== "function") return
+      var next = Object.assign({}, root.settings || {})
+      if (code === "auto") delete next.language
+      else next.language = code
+      root.bar.shell.updateEntryInline(root.moduleName, next)
+    }
+
+    // A helper message code (translated here) or plain text from an older helper.
+    function msgText(m) { return m && I18n.STRINGS.en[m] !== undefined ? t(m) : String(m || "") }
+    function statusName(code, fallback) {
+        var key = { published: "stPublished", verified: "stVerified", needs_fixes: "stNeedsFixes", review: "stReview",
+                    pending: "stPending", open: "stOpen", listed: "stListed" }[code]
+        return key ? t(key) : String(fallback || code || "")
+    }
+    // What changed since the last "Mark as read", built from the per-plugin deltas.
+    readonly property string changesText: {
+        var lines = []
+        for (var i = 0; i < plugins.length; i++) {
+            var p = plugins[i]
+            if (!p.has_changes) continue
+            var parts = []
+            if (p.views_delta > 0) parts.push(t("chViews", [p.views_delta]))
+            if (p.downloads_delta > 0) parts.push(t("chDownloads", [p.downloads_delta]))
+            if (p.hearts_delta > 0) parts.push("+" + p.hearts_delta + " ❤️")
+            if (p.stars_delta > 0) parts.push("+" + p.stars_delta + " ⭐")
+            if (p.status_changed) parts.push(t("chStatus", [statusName(p.status_code, p.status_text)]))
+            lines.push(p.name + ": " + parts.join(", "))
+        }
+        return lines.join("; ")
+    }
 
     property string author: ""
     property bool needsAccount: false
@@ -73,11 +113,11 @@ ShellUi.BarWidget {
             var data = JSON.parse(text)
             if (data.needs_account) {
                 root.needsAccount = true
-                root.accountMessage = data.message || ""
+                root.accountMessage = data.message_code || data.message || ""
                 return
             }
             if (data.status === "error") {
-                root.accountMessage = data.message || "Request failed"
+                root.accountMessage = data.message_code || data.message || "requestFailed"
                 return
             }
             if (currentRequest && currentRequest.command === "paste") {
@@ -212,7 +252,7 @@ ShellUi.BarWidget {
         totalHearts: root.totalHearts
         totalStars: root.totalStars
         hasChanges: root.hasChanges
-        changesSummary: root.changesSummary
+        changesSummary: root.changesText
         intervalMinutes: root.intervalMinutes
         lastUpdatedText: root.lastUpdatedText
         isQuerying: root.isQuerying
@@ -242,12 +282,12 @@ ShellUi.BarWidget {
         active: root.opened || root.hasChanges
 
         tooltipText: {
-            var prefix = "My Plugins · " + (root.author ? "@" + root.author : "no account set") + " · Marketplace Monitor\n"
+            var prefix = "My Plugins · " + (root.author ? "@" + root.author : root.t("noAccount")) + " · " + root.t("marketplaceMonitor") + "\n"
             if (root.hasChanges) {
-                return prefix + "⚡ New updates detected!\n" + (root.changesSummary !== "" ? root.changesSummary : "Metrics changed") + "\nClick to open · Right-click to refresh"
+                return prefix + "⚡ " + root.t("newUpdates") + "\n" + (root.changesText !== "" ? root.changesText : root.t("metricsChanged")) + "\n" + root.t("clickOpenRefresh")
             }
-            var stats = root.totalViews + " views · " + root.totalDownloads + " downloads · " + root.totalStars + " stars\n"
-            var timer = "Interval: " + root.intervalMinutes + "m · Click to open · Right-click to refresh"
+            var stats = root.t("tipStats", [root.totalViews, root.totalDownloads, root.totalStars]) + "\n"
+            var timer = root.t("tipInterval", [root.intervalMinutes]) + " · " + root.t("clickOpenRefresh")
             return prefix + stats + timer
         }
 
