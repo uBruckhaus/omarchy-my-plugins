@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "native/Commons"
+import "native/Commons" as Commons
 import "native/Ui" as Ui
 import qs.Ui as ShellUi
 import "I18n.js" as I18n
@@ -344,7 +345,7 @@ ShellUi.BarWidget {
                     width: 7
                     height: 7
                     radius: 3.5
-                    color: Color.accent
+                    color: Commons.Color.accent
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.topMargin: 1

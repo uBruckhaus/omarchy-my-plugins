@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls as Controls
 import Quickshell
 import "native/Commons"
+import "native/Commons" as Commons
 import "native/Ui" as Ui
 import "I18n.js" as I18n
 
@@ -131,7 +132,7 @@ Ui.Panel {
                                 spacing: Style.space(6)
                                 Text { textFormat: Text.PlainText;
                                     text: "My Plugins"
-                                    color: Color.accent
+                                    color: Commons.Color.accent
                                     font.family: Style.font.family
                                     font.pixelSize: Style.font.title
                                     font.bold: true
@@ -140,13 +141,13 @@ Ui.Panel {
                                     height: Style.space(16)
                                     width: authorBadgeText.implicitWidth + Style.space(8)
                                     radius: Style.space(8)
-                                    color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
+                                    color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.15)
                                     anchors.verticalCenter: parent.verticalCenter
                                     Text { textFormat: Text.PlainText;
                                         id: authorBadgeText
                                         anchors.centerIn: parent
                                         text: root.author ? "@" + root.author + " ✎" : root.t("setAccount") + " ✎"
-                                        color: Color.accent
+                                        color: Commons.Color.accent
                                         font.family: Style.font.family
                                         font.pixelSize: Style.font.caption - 1
                                         font.bold: true
@@ -156,7 +157,7 @@ Ui.Panel {
                             }
                             Text { textFormat: Text.PlainText;
                                 text: root.t("subtitle")
-                                color: Color.foreground
+                                color: Commons.Color.foreground
                                 opacity: 0.6
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.caption
@@ -200,12 +201,12 @@ Ui.Panel {
                     Row {
                         spacing: Style.space(12)
                         Ui.Button { focusable: true; bordered: true; iconText: "\udb80\udc4d"; text: root.t("back") + " · \u232b"; tooltipText: root.t("backTip"); onClicked: root.back(); anchors.verticalCenter: parent.verticalCenter }
-                        Text { textFormat: Text.PlainText; text: root.t("settings").toUpperCase(); color: Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter }
+                        Text { textFormat: Text.PlainText; text: root.t("settings").toUpperCase(); color: Commons.Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter }
                     }
                     Ui.PanelSeparator { width: parent.width }
                     Row {
                         spacing: Style.space(10)
-                        Text { id: languageLabel; textFormat: Text.PlainText; width: Style.space(90); text: root.t("language"); color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; anchors.verticalCenter: parent.verticalCenter }
+                        Text { id: languageLabel; textFormat: Text.PlainText; width: Style.space(90); text: root.t("language"); color: Commons.Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; anchors.verticalCenter: parent.verticalCenter }
                         CompactDropdown {
                             id: languagePicker
                             anchors.verticalCenter: parent.verticalCenter
@@ -230,9 +231,9 @@ Ui.Panel {
                         width: parent.width
                         height: Style.space(42)
                         radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                        color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.05)
                         border.width: 1
-                        border.color: Color.popups.border
+                        border.color: Commons.Color.popups.border
 
                         Item {
                             anchors.fill: parent
@@ -245,7 +246,7 @@ Ui.Panel {
 
                                 Text { textFormat: Text.PlainText;
                                     text: root.t("interval")
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     opacity: 0.8
                                     font.pixelSize: Style.font.caption
                                 }
@@ -272,22 +273,22 @@ Ui.Panel {
                         width: parent.width
                         height: accountColumn.implicitHeight + Style.space(16)
                         radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08)
+                        color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.08)
                         border.width: 1
-                        border.color: Color.accent
+                        border.color: Commons.Color.accent
                         Column {
                             id: accountColumn
                             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
                             spacing: Style.space(6)
-                            Text { textFormat: Text.PlainText; width: parent.width; text: root.t("githubAccount"); color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
-                            Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.t("accountHelp"); color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                            Text { textFormat: Text.PlainText; width: parent.width; text: root.t("githubAccount"); color: Commons.Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
+                            Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.t("accountHelp"); color: Commons.Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
                             Row {
                                 width: parent.width; spacing: Style.space(6)
                                 Ui.TextField { id: accountField; pasteHandler: function(field) { root.pasteRequested() }; width: parent.width - saveAccount.width - Style.space(6); text: root.author; placeholderText: root.t("accountPlaceholder"); onAccepted: root.accountSubmitted(text.trim()) }
                                 Ui.Button { id: saveAccount; focusable: true; bordered: true; text: root.t("save"); onClicked: root.accountSubmitted(accountField.text.trim()) }
                             }
-                            Text { width: parent.width; visible: root.author !== "" && root.accountSource !== "" && root.accountSource !== "settings"; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.t("usingDetected", [root.author, root.accountSource]); color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
-                            Text { width: parent.width; visible: root.accountMessage !== ""; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.hostWidget ? root.hostWidget.msgText(root.accountMessage) : root.accountMessage; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                            Text { width: parent.width; visible: root.author !== "" && root.accountSource !== "" && root.accountSource !== "settings"; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.t("usingDetected", [root.author, root.accountSource]); color: Commons.Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                            Text { width: parent.width; visible: root.accountMessage !== ""; wrapMode: Text.Wrap; textFormat: Text.PlainText; text: root.hostWidget ? root.hostWidget.msgText(root.accountMessage) : root.accountMessage; color: Commons.Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.caption }
                         }
                     }
 
@@ -304,9 +305,9 @@ Ui.Panel {
                         height: bannerCol.implicitHeight + Style.space(16)
                         radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
                         visible: root.hasChanges
-                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
+                        color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.12)
                         border.width: 1
-                        border.color: Color.accent
+                        border.color: Commons.Color.accent
 
                         Column {
                             id: bannerCol
@@ -331,7 +332,7 @@ Ui.Panel {
 
                                     Text { textFormat: Text.PlainText;
                                         text: root.t("newUpdates")
-                                        color: Color.accent
+                                        color: Commons.Color.accent
                                         font.pixelSize: Style.font.body
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
@@ -352,7 +353,7 @@ Ui.Panel {
                             Text { textFormat: Text.PlainText;
                                 width: parent.width
                                 text: root.changesSummary !== "" ? root.changesSummary : root.t("metricsUpdated")
-                                color: Color.foreground
+                                color: Commons.Color.foreground
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.caption
                                 wrapMode: Text.Wrap
@@ -370,23 +371,23 @@ Ui.Panel {
                             width: (parent.width - Style.space(24)) / 4
                             height: Style.space(52)
                             radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.07)
+                            color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.07)
                             border.width: 1
-                            border.color: Color.popups.border
+                            border.color: Commons.Color.popups.border
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: Style.space(2)
                                 Text { textFormat: Text.PlainText;
                                     text: "👁 " + root.t("views")
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     opacity: 0.65
                                     font.pixelSize: Style.font.caption
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text { textFormat: Text.PlainText;
                                     text: String(root.totalViews)
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     font.pixelSize: Style.font.title
                                     font.bold: true
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -399,23 +400,23 @@ Ui.Panel {
                             width: (parent.width - Style.space(24)) / 4
                             height: Style.space(52)
                             radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.07)
+                            color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.07)
                             border.width: 1
-                            border.color: Color.popups.border
+                            border.color: Commons.Color.popups.border
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: Style.space(2)
                                 Text { textFormat: Text.PlainText;
                                     text: "📥 " + root.t("downloads")
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     opacity: 0.65
                                     font.pixelSize: Style.font.caption
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text { textFormat: Text.PlainText;
                                     text: String(root.totalDownloads)
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     font.pixelSize: Style.font.title
                                     font.bold: true
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -428,23 +429,23 @@ Ui.Panel {
                             width: (parent.width - Style.space(24)) / 4
                             height: Style.space(52)
                             radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.07)
+                            color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.07)
                             border.width: 1
-                            border.color: Color.popups.border
+                            border.color: Commons.Color.popups.border
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: Style.space(2)
                                 Text { textFormat: Text.PlainText;
                                     text: "❤️ " + root.t("hearts")
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     opacity: 0.65
                                     font.pixelSize: Style.font.caption
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text { textFormat: Text.PlainText;
                                     text: String(root.totalHearts)
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     font.pixelSize: Style.font.title
                                     font.bold: true
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -457,23 +458,23 @@ Ui.Panel {
                             width: (parent.width - Style.space(24)) / 4
                             height: Style.space(52)
                             radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.07)
+                            color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.07)
                             border.width: 1
-                            border.color: Color.popups.border
+                            border.color: Commons.Color.popups.border
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: Style.space(2)
                                 Text { textFormat: Text.PlainText;
                                     text: "⭐ " + root.t("ghStars")
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     opacity: 0.65
                                     font.pixelSize: Style.font.caption
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text { textFormat: Text.PlainText;
                                     text: String(root.totalStars)
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
                                     font.pixelSize: Style.font.title
                                     font.bold: true
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -483,7 +484,7 @@ Ui.Panel {
                     }
 
                     Text { textFormat: Text.PlainText; anchors.right: parent.right
-                        text: root.t("updatedAt", [root.formatTime(root.lastUpdatedText)]); color: Color.foreground; opacity: 0.55; font.pixelSize: Style.font.caption }
+                        text: root.t("updatedAt", [root.formatTime(root.lastUpdatedText)]); color: Commons.Color.foreground; opacity: 0.55; font.pixelSize: Style.font.caption }
                     Ui.Button { focusable: true; width: parent.width; bordered: true; text: "📈  " + root.t("historyButton"); onClicked: root.showHistory = true }
 
                     // History of views, downloads, hearts and stars
@@ -493,9 +494,9 @@ Ui.Panel {
                         width: parent.width
                         height: sortRow.implicitHeight + Style.space(16)
                         radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                        color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.05)
                         border.width: 1
-                        border.color: Color.popups.border
+                        border.color: Commons.Color.popups.border
 
                         Row {
                             id: sortRow
@@ -509,7 +510,7 @@ Ui.Panel {
 
                             Text { textFormat: Text.PlainText;
                                 text: root.t("sort")
-                                color: Color.foreground
+                                color: Commons.Color.foreground
                                 opacity: 0.8
                                 font.pixelSize: Style.font.caption
                                 anchors.verticalCenter: parent.verticalCenter
@@ -564,7 +565,7 @@ Ui.Panel {
                             Text { textFormat: Text.PlainText;
                                 width: Style.space(92)
                                 text: root.t("colPublished").toUpperCase()
-                                color: Color.foreground
+                                color: Commons.Color.foreground
                                 opacity: 0.5
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.caption - 1
@@ -574,7 +575,7 @@ Ui.Panel {
                             Text { textFormat: Text.PlainText;
                                 width: Style.space(150)
                                 text: root.t("colPlugin").toUpperCase()
-                                color: Color.foreground
+                                color: Commons.Color.foreground
                                 opacity: 0.5
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.caption - 1
@@ -583,7 +584,7 @@ Ui.Panel {
 
                             Text { textFormat: Text.PlainText;
                                 text: root.t("colStatus").toUpperCase()
-                                color: Color.foreground
+                                color: Commons.Color.foreground
                                 opacity: 0.5
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.caption - 1
@@ -599,9 +600,9 @@ Ui.Panel {
                             width: parent.width
                             height: cardColumn.implicitHeight + Style.space(16)
                             radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+                            color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.06)
                             border.width: 1
-                            border.color: modelData.has_changes ? Color.accent : Color.popups.border
+                            border.color: modelData.has_changes ? Commons.Color.accent : Commons.Color.popups.border
 
                             Column {
                                 id: cardColumn
@@ -624,9 +625,9 @@ Ui.Panel {
                                             width: Style.space(92)
                                             height: Style.space(22)
                                             radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 4)
-                                            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                                            color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.08)
                                             border.width: 1
-                                            border.color: Color.popups.border
+                                            border.color: Commons.Color.popups.border
 
                                             Row {
                                                 anchors.centerIn: parent
@@ -637,7 +638,7 @@ Ui.Panel {
                                                 }
                                                 Text { textFormat: Text.PlainText;
                                                     text: modelData.publish_date || "—"
-                                                    color: Color.foreground
+                                                    color: Commons.Color.foreground
                                                     font.family: Style.font.family
                                                     font.pixelSize: Style.font.caption
                                                     font.bold: true
@@ -670,7 +671,7 @@ Ui.Panel {
 
                                                 Text { textFormat: Text.PlainText;
                                                     text: modelData.name
-                                                    color: Color.foreground
+                                                    color: Commons.Color.foreground
                                                     font.family: Style.font.family
                                                     font.pixelSize: Style.font.body
                                                     font.bold: true
@@ -724,7 +725,7 @@ Ui.Panel {
                                         anchors.right: parent.right
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: "#" + modelData.issue_number + " ↗"
-                                        color: Color.accent
+                                        color: Commons.Color.accent
                                         font.pixelSize: Style.font.caption
                                         MouseArea {
                                             anchors.fill: parent
@@ -743,7 +744,7 @@ Ui.Panel {
                                     // GitHub release alongside when it differs.
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "📦 " + root.t("ver") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "📦 " + root.t("ver") + ":"; color: Commons.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
                                         Text { textFormat: Text.PlainText;
                                             text: {
                                                 var v = modelData.local_version || modelData.release_version || ""
@@ -754,7 +755,7 @@ Ui.Panel {
                                                 }
                                                 return out
                                             }
-                                            color: Color.foreground
+                                            color: Commons.Color.foreground
                                             font.bold: true
                                             font.pixelSize: Style.font.caption
                                         }
@@ -763,19 +764,19 @@ Ui.Panel {
                                     // Views
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "👁 " + root.t("views") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                        Text { textFormat: Text.PlainText; text: String(modelData.views); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "👁 " + root.t("views") + ":"; color: Commons.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: String(modelData.views); color: Commons.Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                         Rectangle {
                                             visible: modelData.views_delta > 0
                                             height: Style.space(14)
                                             width: viewsDeltaText.implicitWidth + 6
                                             radius: 3
-                                            color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
+                                            color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.25)
                                             Text { textFormat: Text.PlainText;
                                                 id: viewsDeltaText
                                                 anchors.centerIn: parent
                                                 text: "+" + modelData.views_delta
-                                                color: Color.accent
+                                                color: Commons.Color.accent
                                                 font.pixelSize: Style.font.caption - 2
                                                 font.bold: true
                                             }
@@ -785,19 +786,19 @@ Ui.Panel {
                                     // Downloads
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "📥 " + root.t("copies") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                        Text { textFormat: Text.PlainText; text: String(modelData.downloads); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "📥 " + root.t("copies") + ":"; color: Commons.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: String(modelData.downloads); color: Commons.Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                         Rectangle {
                                             visible: modelData.downloads_delta > 0
                                             height: Style.space(14)
                                             width: dlDeltaText.implicitWidth + 6
                                             radius: 3
-                                            color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
+                                            color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.25)
                                             Text { textFormat: Text.PlainText;
                                                 id: dlDeltaText
                                                 anchors.centerIn: parent
                                                 text: "+" + modelData.downloads_delta
-                                                color: Color.accent
+                                                color: Commons.Color.accent
                                                 font.pixelSize: Style.font.caption - 2
                                                 font.bold: true
                                             }
@@ -807,15 +808,15 @@ Ui.Panel {
                                     // Hearts
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "❤️ " + root.t("hearts") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                        Text { textFormat: Text.PlainText; text: String(modelData.hearts); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "❤️ " + root.t("hearts") + ":"; color: Commons.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: String(modelData.hearts); color: Commons.Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                     }
 
                                     // Stars
                                     Row {
                                         spacing: Style.space(4)
-                                        Text { textFormat: Text.PlainText; text: "⭐ " + root.t("ghStars") + ":"; color: Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
-                                        Text { textFormat: Text.PlainText; text: String(modelData.stars); color: Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: "⭐ " + root.t("ghStars") + ":"; color: Commons.Color.foreground; opacity: 0.6; font.pixelSize: Style.font.caption }
+                                        Text { textFormat: Text.PlainText; text: String(modelData.stars); color: Commons.Color.foreground; font.bold: true; font.pixelSize: Style.font.caption }
                                     }
                                 }
 
@@ -864,23 +865,23 @@ Ui.Panel {
                     Row {
                         spacing: Style.space(12)
                         Ui.Button { focusable: true; bordered: true; iconText: "\udb80\udc4d"; text: root.t("back") + " · \u232b"; tooltipText: root.t("backTip"); onClicked: root.back(); anchors.verticalCenter: parent.verticalCenter }
-                        Text { textFormat: Text.PlainText; text: root.t("history").toUpperCase(); color: Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter }
+                        Text { textFormat: Text.PlainText; text: root.t("history").toUpperCase(); color: Commons.Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter }
                     }
                     Rectangle {
                         width: parent.width
                         height: historyColumn.implicitHeight + Style.space(16)
                         radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                        color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.05)
                         border.width: 1
-                        border.color: Color.popups.border
+                        border.color: Commons.Color.popups.border
                         Column {
                             id: historyColumn
                             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(10)
                             spacing: Style.space(8)
                             Row {
                                 width: parent.width; spacing: Style.space(8)
-                                Text { textFormat: Text.PlainText; text: "📈 " + root.t("history"); color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
-                                Text { textFormat: Text.PlainText; anchors.verticalCenter: parent.verticalCenter; color: Color.foreground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption
+                                Text { textFormat: Text.PlainText; text: "📈 " + root.t("history"); color: Commons.Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
+                                Text { textFormat: Text.PlainText; anchors.verticalCenter: parent.verticalCenter; color: Commons.Color.foreground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption
                                        text: root.hoveredBar >= 0 && root.historyValues[root.hoveredBar] !== null
                                              ? root.t("hoverValue", [(root.history.labels || [])[root.hoveredBar], root.historyValues[root.hoveredBar], (root.history.totals || [])[root.hoveredBar]])
                                              : root.t("inRange", [root.historyGain]) }
@@ -902,7 +903,7 @@ Ui.Panel {
                                 width: parent.width; height: Style.space(110)
                                 readonly property int count: Math.max(1, root.historyValues.length)
                                 readonly property real slot: width / count
-                                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1; color: Color.foreground; opacity: 0.25 }
+                                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1; color: Commons.Color.foreground; opacity: 0.25 }
                                 Repeater {
                                     model: root.historyValues
                                     Rectangle {
@@ -913,10 +914,10 @@ Ui.Panel {
                                         height: modelData === null ? 2 : Math.max(modelData > 0 ? 3 : 1, (chart.height - Style.space(14)) * modelData / root.historyMax)
                                         anchors.bottom: parent.bottom
                                         radius: Math.min(3, width / 2)
-                                        color: modelData === null ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
-                                                                  : (root.hoveredBar === index ? Color.foreground : Color.accent)
+                                        color: modelData === null ? Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.15)
+                                                                  : (root.hoveredBar === index ? Commons.Color.foreground : Commons.Color.accent)
                                         Text { textFormat: Text.PlainText; visible: modelData !== null && modelData > 0 && chart.count <= 12; anchors.bottom: parent.top; anchors.horizontalCenter: parent.horizontalCenter
-                                               text: modelData; color: Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1 }
+                                               text: modelData; color: Commons.Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1 }
                                         MouseArea { anchors.fill: parent; anchors.topMargin: -chart.height; hoverEnabled: true
                                                     onEntered: root.hoveredBar = index; onExited: if (root.hoveredBar === index) root.hoveredBar = -1 }
                                     }
@@ -929,10 +930,10 @@ Ui.Panel {
                                     Text { textFormat: Text.PlainText; required property var modelData; required property int index
                                            visible: chart.count <= 12 || index % 5 === (chart.count - 1) % 5
                                            x: index * chart.slot + chart.slot / 2 - width / 2
-                                           text: modelData; color: Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1 }
+                                           text: modelData; color: Commons.Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1 }
                                 }
                             }
-                            Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1
+                            Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Commons.Color.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption - 1
                                    text: root.history.first_day ? root.t(root.historyRange === "daily" ? "gainsDay" : root.historyRange === "weekly" ? "gainsWeek" : "gainsMonth", [root.history.first_day])
                                                                 : root.t("historyStarts") }
                         }
@@ -944,14 +945,14 @@ Ui.Panel {
                         visible: root.confirmClearHistory
                         height: visible ? confirmColumn.implicitHeight + Style.space(16) : 0
                         radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
-                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.10)
+                        color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.10)
                         border.width: 1
-                        border.color: Color.accent
+                        border.color: Commons.Color.accent
                         Column {
                             id: confirmColumn
                             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Style.space(8)
                             spacing: Style.space(6)
-                            Text { textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap; color: Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption
+                            Text { textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap; color: Commons.Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption
                                    text: root.history.first_day ? root.t("confirmClearSince", [root.history.first_day]) : root.t("confirmClear") }
                             Row {
                                 spacing: Style.space(6)
