@@ -109,6 +109,7 @@ the day My Plugins first runs.
 - **Right-Click Bar Icon**: Triggers an immediate refresh query.
 - **Bar Icon Dot**: Appears and pulses in `Color.accent` whenever new views, downloads, stars, or status updates occur since the last check.
 - **Mark as Read**: Clicking "✓ Mark as Read" in the panel or opening the panel acknowledges recent updates and resets the icon badge.
+- **Panel Height**: Drag the grip on the panel edge away from the bar to make the panel taller or shorter (the width stays fixed). The height is remembered; double-click the grip to fit the content again.
 
 ---
 

@@ -90,7 +90,13 @@ Ui.Panel {
         owner: root.hostWidget || root
         open: root.opened
         contentWidth: fittedContentWidth(Style.space(540))
-        contentHeight: fittedContentHeight(content.implicitHeight, Style.space(660))
+        // Fixed width; the height follows the content until the user drags the edge away from the bar.
+        readonly property int savedHeight: root.hostWidget ? root.hostWidget.panelHeight : 0
+        property real dragHeight: -1
+        readonly property real minHeight: Style.space(220)
+        contentHeight: dragHeight > 0 ? cappedContentHeight(Math.max(minHeight, dragHeight))
+                     : savedHeight > 0 ? cappedContentHeight(Math.max(minHeight, savedHeight))
+                     : fittedContentHeight(content.implicitHeight, Style.space(660))
 
         Flickable {
             id: panelScroll
@@ -962,6 +968,49 @@ Ui.Panel {
                         }
                     }
                 }
+            }
+        }
+
+        // Resize grip on the edge away from the bar: drag changes the height only,
+        // double-click goes back to fitting the content.
+        MouseArea {
+            id: heightGrip
+            readonly property bool atTop: root.bar && root.bar.position === "bottom"
+            property real startY: 0
+            property real startHeight: 0
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: atTop ? undefined : parent.bottom
+            anchors.top: atTop ? parent.top : undefined
+            anchors.bottomMargin: -popup.padding
+            anchors.topMargin: -popup.padding
+            height: Style.space(10)
+            hoverEnabled: true
+            cursorShape: Qt.SizeVerCursor
+            onPressed: function(mouse) {
+                startY = mapToItem(null, mouse.x, mouse.y).y
+                startHeight = popup.contentHeight
+                popup.dragHeight = startHeight
+            }
+            onPositionChanged: function(mouse) {
+                if (!pressed) return
+                var delta = mapToItem(null, mouse.x, mouse.y).y - startY
+                popup.dragHeight = Math.min(popup.availableCardHeight, startHeight + (atTop ? -delta : delta))
+            }
+            onReleased: {
+                var h = popup.contentHeight
+                popup.dragHeight = -1
+                if (root.hostWidget && Math.abs(h - startHeight) >= 2) root.hostWidget.setPanelHeight(h)
+            }
+            onDoubleClicked: { popup.dragHeight = -1; if (root.hostWidget) root.hostWidget.setPanelHeight(0) }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Style.space(40)
+                height: Style.space(3)
+                radius: height / 2
+                color: Commons.Color.foreground
+                opacity: heightGrip.containsMouse || heightGrip.pressed ? 0.5 : 0.15
             }
         }
     }

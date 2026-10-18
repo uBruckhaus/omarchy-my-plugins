@@ -30,6 +30,16 @@ ShellUi.BarWidget {
       root.bar.shell.updateEntryInline(root.moduleName, next)
     }
 
+    // Panel height dragged by the user (0 = fit the content); the width stays fixed.
+    readonly property int panelHeight: Number(root.setting("panel_height", 0)) || 0
+    function setPanelHeight(h) {
+      if (!root.bar || !root.bar.shell || typeof root.bar.shell.updateEntryInline !== "function") return
+      var next = Object.assign({}, root.settings || {})
+      if (h > 0) next.panel_height = Math.round(h)
+      else delete next.panel_height
+      root.bar.shell.updateEntryInline(root.moduleName, next)
+    }
+
     // A helper message code (translated here) or plain text from an older helper.
     function msgText(m) { return m && I18n.STRINGS.en[m] !== undefined ? t(m) : String(m || "") }
     function statusName(code, fallback) {
