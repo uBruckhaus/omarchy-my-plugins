@@ -21,6 +21,9 @@ Ui.Panel {
     property bool showHistory: false
     // Settings page (gear in the header). Back with the button, Backspace or Esc.
     property bool settingsOpen: false
+    // Information page: the author's other marketplace plugins.
+    property bool infoOpen: false
+    onInfoOpenChanged: { panelScroll.contentY = 0; if (infoOpen) showHistory = false; content.forceActiveFocus() }
     readonly property string lang: hostWidget ? hostWidget.lang : "en"
     readonly property string languageSetting: hostWidget ? hostWidget.languageSetting : "auto"
     readonly property string systemLang: hostWidget ? hostWidget.systemLang : "en"
@@ -29,7 +32,7 @@ Ui.Panel {
     onSettingsOpenChanged: { panelScroll.contentY = 0; if (settingsOpen) showHistory = false; content.forceActiveFocus() }
     // Without an account there is nothing to show: start on the settings page.
     onNeedsAccountChanged: if (needsAccount) settingsOpen = true
-    function back() { if (settingsOpen) settingsOpen = false; else showHistory = false; content.forceActiveFocus() }
+    function back() { if (infoOpen) infoOpen = false; else if (settingsOpen) settingsOpen = false; else showHistory = false; content.forceActiveFocus() }
     property bool confirmClearHistory: false
     property var history: ({})
     property string historyMetric: "views"
@@ -64,7 +67,7 @@ Ui.Panel {
     function pasteIntoAccount(text) { accountField.insert(text) }
 
     function reloadHistory() { historyRequested(historyPlugin, historyMetric, historyRange) }
-    onOpenedChanged: if (opened) { reloadHistory(); if (needsAccount) settingsOpen = true } else { showHistory = false; settingsOpen = false }
+    onOpenedChanged: if (opened) { reloadHistory(); if (needsAccount) settingsOpen = true } else { showHistory = false; settingsOpen = false; infoOpen = false }
     onShowHistoryChanged: { panelScroll.contentY = 0; confirmClearHistory = false; if (showHistory) reloadHistory() }
 
     function formatTime(isoString) {
@@ -113,9 +116,9 @@ Ui.Panel {
                 focus: root.opened
                 spacing: Style.space(12)
                 // Esc and Backspace leave the history or settings page first (text fields keep their own Backspace).
-                Keys.onEscapePressed: { if (root.showHistory || root.settingsOpen) root.back(); else root.close() }
+                Keys.onEscapePressed: { if (root.showHistory || root.settingsOpen || root.infoOpen) root.back(); else root.close() }
                 Keys.onPressed: function(event) {
-                    if (event.key === Qt.Key_Backspace && (root.showHistory || root.settingsOpen)) { root.back(); event.accepted = true }
+                    if (event.key === Qt.Key_Backspace && (root.showHistory || root.settingsOpen || root.infoOpen)) { root.back(); event.accepted = true }
                 }
 
                 // Header
@@ -176,18 +179,33 @@ Ui.Panel {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: Style.space(6)
 
+                        // Refresh as a symbol, like the other header buttons; an
+                        // hourglass while a check runs.
                         Ui.Button {
+                            visible: !root.settingsOpen && !root.infoOpen
                             implicitHeight: Style.space(26)
-                            text: root.isQuerying ? root.t("checking") : "↻ " + root.t("refresh")
+                            text: root.isQuerying ? "\u{F051F}" : "\u{F0450}"
                             fontSize: Style.font.caption
                             bordered: true
                             focusable: true
                             enabled: !root.isQuerying
+                            tooltipText: root.isQuerying ? root.t("checking") : root.t("refresh")
                             onClicked: root.refreshRequested()
                         }
 
                         Ui.Button {
-                            visible: !root.settingsOpen
+                            visible: !root.settingsOpen && !root.infoOpen
+                            implicitHeight: Style.space(26)
+                            text: "\u{F02FC}"
+                            fontSize: Style.font.caption
+                            bordered: true
+                            focusable: true
+                            tooltipText: root.t("information")
+                            onClicked: root.infoOpen = true
+                        }
+
+                        Ui.Button {
+                            visible: !root.settingsOpen && !root.infoOpen
                             implicitHeight: Style.space(26)
                             text: "\udb81\udc93"
                             fontSize: Style.font.caption
@@ -196,6 +214,28 @@ Ui.Panel {
                             tooltipText: root.t("settings")
                             onClicked: root.settingsOpen = true
                         }
+                    }
+                }
+
+                // Information page: the author's other marketplace plugins.
+                Column {
+                    width: parent.width
+                    spacing: Style.space(12)
+                    visible: root.infoOpen
+                    Row {
+                        spacing: Style.space(12)
+                        Ui.Button { focusable: true; bordered: true; iconText: "\udb80\udc4d"; text: root.t("back") + " · \u232b"; tooltipText: root.t("backTip"); onClicked: root.back(); anchors.verticalCenter: parent.verticalCenter }
+                        Text { textFormat: Text.PlainText; text: root.t("information").toUpperCase(); color: Commons.Color.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter }
+                    }
+                    Ui.PanelSeparator { width: parent.width }
+                    MorePlugins {
+                        width: parent.width
+                        separated: false
+                        ownId: "ubruckhaus.my-plugins"
+                        lang: root.lang
+                        fg: Commons.Color.foreground
+                        fontFamily: Style.font.family
+                        onOpened: root.close()
                     }
                 }
 
@@ -305,7 +345,7 @@ Ui.Panel {
                 Column {
                     width: parent.width
                     spacing: Style.space(12)
-                    visible: !root.showHistory && !root.settingsOpen
+                    visible: !root.showHistory && !root.settingsOpen && !root.infoOpen
                     Rectangle {
                         width: parent.width
                         height: bannerCol.implicitHeight + Style.space(16)
@@ -867,7 +907,7 @@ Ui.Panel {
                 Column {
                     width: parent.width
                     spacing: Style.space(12)
-                    visible: root.showHistory && !root.settingsOpen
+                    visible: root.showHistory && !root.settingsOpen && !root.infoOpen
                     Row {
                         spacing: Style.space(12)
                         Ui.Button { focusable: true; bordered: true; iconText: "\udb80\udc4d"; text: root.t("back") + " · \u232b"; tooltipText: root.t("backTip"); onClicked: root.back(); anchors.verticalCenter: parent.verticalCenter }
