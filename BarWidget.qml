@@ -303,9 +303,10 @@ ShellUi.BarWidget {
         }
 
         iconComponent: Component {
+            // No anchors: the bar sizes this item (Omarchy 4.5 loads it into an
+            // unsized Loader, so filling the parent would leave a 0×0 canvas).
             Item {
                 id: iconContainer
-                anchors.fill: parent
 
                 Canvas {
                     id: iconCanvas
