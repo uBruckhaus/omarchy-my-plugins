@@ -362,6 +362,40 @@ def fetch_marketplace_stats():
 
 
 CATALOG_FIELDS = ("id", "name", "author", "repo", "version", "stars", "listedAt", "verificationStatus", "description")
+MAX_CATALOG_PLUGINS = 20000   # the real catalog lists ~6,000; records beyond this are ignored
+MAX_TRACKED_PLUGINS = 100     # cards the panel shows for one account
+MAX_FIELD_CHARS = 1000        # longest catalog text kept (descriptions are capped at 500 by the marketplace)
+
+
+def catalog_record(entry):
+    """One catalog entry reduced to CATALOG_FIELDS, strings cut to MAX_FIELD_CHARS; None if unusable."""
+    if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not entry["id"].strip():
+        return None
+    record = {}
+    for key in CATALOG_FIELDS:
+        value = entry.get(key)
+        if isinstance(value, str):
+            value = value[:MAX_FIELD_CHARS]
+        elif not isinstance(value, (int, float, bool)) or value is None:
+            value = None
+        record[key] = value
+    record["id"] = record["id"][:200]
+    return record
+
+
+def unique_catalog(entries):
+    """Catalog records deduplicated by id (first wins), at most MAX_CATALOG_PLUGINS."""
+    seen = set()
+    plugins = []
+    for entry in entries if isinstance(entries, list) else []:
+        record = catalog_record(entry)
+        if record is None or record["id"] in seen:
+            continue
+        seen.add(record["id"])
+        plugins.append(record)
+        if len(plugins) >= MAX_CATALOG_PLUGINS:
+            break
+    return plugins
 
 
 def fetch_catalog(state_dir=None, now=None):
@@ -371,7 +405,7 @@ def fetch_catalog(state_dir=None, now=None):
     cache = load_json_file(cache_file, fallback={}) or {}
     now = now if now is not None else time.time()
     if cache.get("plugins") and now - float(cache.get("fetched_at", 0)) < CATALOG_MAX_AGE:
-        return cache["plugins"]
+        return unique_catalog(cache["plugins"])
     try:
         status, body, etag = http_get(CATALOG_URL, CATALOG_LIMIT, timeout=60, etag=cache.get("etag") if cache.get("plugins") else None)
         if status == 304:
@@ -379,15 +413,11 @@ def fetch_catalog(state_dir=None, now=None):
         else:
             data = json.loads(body.decode("utf-8"))
             entries = data.get("plugins", []) if isinstance(data, dict) else []
-            plugins = []
-            for entry in entries if isinstance(entries, list) else []:
-                if isinstance(entry, dict) and isinstance(entry.get("id"), str):
-                    plugins.append({k: entry.get(k) for k in CATALOG_FIELDS})
-            cache = {"etag": etag, "fetched_at": now, "plugins": plugins}
+            cache = {"etag": etag, "fetched_at": now, "plugins": unique_catalog(entries)}
         save_json_file(cache_file, cache)
     except Exception as e:
         sys.stderr.write(f"Warning: Failed to fetch marketplace catalog: {e}\n")
-    return cache.get("plugins", [])
+    return unique_catalog(cache.get("plugins", []))
 
 
 def fetch_marketplace_issues(account):
@@ -417,13 +447,15 @@ def fetch_github_repos(account):
 
 
 def discover_plugins(account, catalog, issues=None):
-    """Plugins listed in the marketplace whose repository belongs to `account`."""
+    """Plugins listed in the marketplace whose repository belongs to `account` (each id once, at most MAX_TRACKED_PLUGINS)."""
     wanted = account.lower()
     found = []
-    for entry in catalog:
+    for entry in unique_catalog(catalog):
         owner, repo_name = repo_owner(entry.get("repo"))
         if not owner or owner.lower() != wanted:
             continue
+        if len(found) >= MAX_TRACKED_PLUGINS:
+            break
         found.append({
             "id": entry["id"],
             "name": str(entry.get("name") or entry["id"]),

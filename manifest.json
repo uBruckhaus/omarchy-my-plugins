@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "ubruckhaus.my-plugins",
   "name": "My Plugins",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "author": "uBruckhaus",
   "license": "MIT",
   "description": "Monitor your Omarchy marketplace plugins: publication status, views, downloads, hearts and stars with daily, weekly and monthly history charts.",

@@ -72,6 +72,7 @@ ShellUi.BarWidget {
     property var historyRequest: ({plugin: "all", metric: "views", range: "daily"})
     property int intervalMinutes: Math.max(1, Number(setting("intervalMinutes", 5)) || 5)
     property var plugins: []
+    readonly property int maxPluginCards: 100   // same as MAX_TRACKED_PLUGINS in monitor.py
     property int totalViews: 0
     property int totalDownloads: 0
     property int totalHearts: 0
@@ -148,7 +149,7 @@ ShellUi.BarWidget {
             if (data.status === "ok") {
                 if (data.author !== undefined) root.author = data.author
                 if (data.account_source !== undefined) root.accountSource = data.account_source
-                if (data.plugins !== undefined) root.plugins = data.plugins
+                if (data.plugins !== undefined) root.plugins = Array.isArray(data.plugins) ? data.plugins.slice(0, root.maxPluginCards) : []
                 if (data.total_views !== undefined) root.totalViews = data.total_views
                 if (data.total_downloads !== undefined) root.totalDownloads = data.total_downloads
                 if (data.total_hearts !== undefined) root.totalHearts = data.total_hearts
