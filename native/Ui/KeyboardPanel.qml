@@ -193,10 +193,19 @@ PanelWindow {
   readonly property real barH: anchorWindow ? anchorWindow.height : 0
   // The painted bar strip's thickness. Since Omarchy 4.5.0rc2 the bar window spans
   // its whole screen, so its size says nothing about the bar: ask the bar
-  // (barSizeFor includes a notch floor). Older shells: the window is the strip.
+  // (barSizeFor includes a notch floor). A third-party widget's bar facade has no
+  // barSizeFor; the shell facade's bar state (bar.shell.bar) has it.
+  // Older shells: the window is the strip.
+  readonly property var barSizes: !bar ? null
+    : typeof bar.barSizeFor === "function" ? bar
+    : bar.shell && bar.shell.bar && typeof bar.shell.bar.barSizeFor === "function" ? bar.shell.bar
+    : null
   readonly property real barThickness: {
     if (!bar) return 0
-    if (typeof bar.barSizeFor === "function" && screen) return bar.barSizeFor(screen.name)
+    if (barSizes && screen) {
+      var size = Number(barSizes.barSizeFor(screen.name)) || 0
+      if (size > 0) return size
+    }
     var horizontal = barPos === "top" || barPos === "bottom"
     var window = horizontal ? barH : barW
     var whole = horizontal ? screenH : screenW
