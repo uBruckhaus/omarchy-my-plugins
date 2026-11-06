@@ -26,8 +26,8 @@ from; click the `@account ✎` badge to change it.
 
 **Requirements:** `python3` (standard library only). Optional: the GitHub CLI `gh`, logged in, for
 review status, live star counts and plugins kept in your GitHub organizations; without it, stars come
-from the daily marketplace catalog, only repositories of the account itself count, and the only status
-shown is the catalog's verified mark (*Listed & Verified*).
+from the daily marketplace catalog, only repositories of the account itself count, and there is no
+review status: catalog entries marked verified show *Listed & Verified*, all others *Published*.
 
 ## Remove
 
