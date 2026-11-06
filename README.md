@@ -25,8 +25,9 @@ github.user`, a GitHub no-reply e-mail, or your installed plugin checkouts) and 
 from; click the `@account ✎` badge to change it.
 
 **Requirements:** `python3` (standard library only). Optional: the GitHub CLI `gh`, logged in, for
-review status and live star counts; without it, stars come from the daily marketplace catalog and no
-review status is shown.
+review status, live star counts and plugins kept in your GitHub organizations; without it, stars come
+from the daily marketplace catalog, only repositories of the account itself count, and the only status
+shown is the catalog's verified mark (*Listed & Verified*).
 
 ## Remove
 
@@ -73,7 +74,8 @@ a size cap and an overall deadline, redirects are refused, and links open only f
   - Default: **Views, Descending**.
   - Adjust anytime directly from the panel dropdowns or CLI.
 - **🚫 Published Only**:
-  - Only plugins listed in the marketplace catalog under your GitHub account are shown.
+  - Only plugins listed in the marketplace catalog whose repository belongs to your GitHub account (or,
+    with `gh` logged into it, to one of its organizations) are shown.
 - **📦 Version Display**:
   - Each plugin card shows the version currently published in the marketplace.
 - **🎯 One-Click Deep Links**:
