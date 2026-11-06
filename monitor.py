@@ -261,7 +261,7 @@ def count(value, default=0):
         return default
     if isinstance(value, str):
         value = value.strip()
-        if not value.isdigit() or len(value) > 13:
+        if not re.fullmatch(r"[0-9]{1,13}", value):     # ASCII only: "²".isdigit() is true, int() refuses it
             return default
         value = int(value)
     if isinstance(value, float):

@@ -106,7 +106,7 @@ class DiscoveryTests(Isolated):
         self.assertEqual([p["id"] for p in monitor.discover_plugins("uBruckhaus", catalog, orgs=orgs)], ["ubruckhaus.last"])
 
     def test_count_rejects_odd_values(self):
-        for bad in ("invalid", "-3", "1e9", "", None, [], {}, True, float("nan"), float("inf"), -1, "9" * 40):
+        for bad in ("invalid", "-3", "1e9", "", None, [], {}, True, float("nan"), float("inf"), -1, "9" * 40, "²", "١٢", "٣", "1_000"):
             self.assertEqual(monitor.count(bad), 0, bad)
         self.assertEqual((monitor.count(" 12 "), monitor.count(7.9), monitor.count(10 ** 20)), (12, 7, monitor.MAX_COUNT))
 

@@ -97,7 +97,8 @@ developer can use it. Leave the field empty to use the account `gh` is logged in
 When `gh` is logged into that same account, plugins in repositories of the GitHub organizations
 it belongs to count too (e.g. `github.com/maprisma/omarchy-maprisma-launcher`), read with
 `gh api user/orgs`. The review status of every card comes from marketplace issues opened by your
-account; a review started by another member of the organization is not shown.
+account (and the catalog's verified mark when there is none); a review started by another member
+of the organization is not shown.
 
 Data sources: the marketplace catalog (`site/catalog.json` of `omacom/omarchy-plugin-marketplace`,
 cached and refreshed at most hourly with ETag), the marketplace stats API (views, downloads, hearts),
