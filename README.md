@@ -91,6 +91,9 @@ Set your **GitHub account** (click the `@account ✎` badge in the popup): the o
 repositories, e.g. `uBruckhaus` for `github.com/uBruckhaus/omarchy-theme-manager`. My Plugins lists
 every plugin in the marketplace catalog whose repository belongs to that account, so any plugin
 developer can use it. Leave the field empty to use the account `gh` is logged into.
+When `gh` is logged into that same account, plugins in repositories of the GitHub organizations
+it belongs to count too (e.g. `github.com/maprisma/omarchy-maprisma-launcher`), read with
+`gh api user/orgs`.
 
 Data sources: the marketplace catalog (`site/catalog.json` of `omacom/omarchy-plugin-marketplace`,
 cached and refreshed at most hourly with ETag), the marketplace stats API (views, downloads, hearts),

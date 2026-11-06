@@ -434,25 +434,50 @@ def fetch_marketplace_issues(account):
     return []
 
 
-def fetch_github_repos(account):
-    """Live star counts: {repo name: {stargazerCount, url, description}} (the catalog refreshes daily)."""
+MAX_ORGS = 20
+
+
+def fetch_account_orgs(account):
+    """GitHub organizations `account` belongs to, so plugins kept in an org repository count as its own.
+    Membership is often private, so this asks gh's logged-in user and only when that user is `account`."""
     try:
-        code, out = run_bounded(["gh", "repo", "list", account, "--limit", "300", "--json", "name,description,stargazerCount,url"],
-                                limit=4 * 1024 * 1024, timeout=20)
-        if code == 0:
-            return {r["name"]: r for r in json.loads(out) if isinstance(r, dict) and isinstance(r.get("name"), str)}
-    except Exception as e:
-        sys.stderr.write(f"Warning: Failed to fetch GitHub repos for '{account}': {e}\n")
-    return {}
+        if gh_login().lower() != account.lower():
+            return []
+        code, out = run_bounded(["gh", "api", "user/orgs", "--jq", ".[].login"], limit=64 * 1024, timeout=8)
+        if code != 0:
+            return []
+        orgs = [o.strip() for o in out.splitlines() if valid_account(o.strip())]
+        return orgs[:MAX_ORGS]
+    except Exception:
+        return []
 
 
-def discover_plugins(account, catalog, issues=None):
-    """Plugins listed in the marketplace whose repository belongs to `account` (each id once, at most MAX_TRACKED_PLUGINS)."""
-    wanted = account.lower()
+def fetch_github_repos(owners):
+    """Live star counts: {(owner, repo name) lowercased: {stargazerCount, url, description}} (the catalog refreshes daily)."""
+    if isinstance(owners, str):
+        owners = [owners]
+    repos = {}
+    for owner in owners:
+        try:
+            code, out = run_bounded(["gh", "repo", "list", owner, "--limit", "300", "--json", "name,description,stargazerCount,url"],
+                                    limit=4 * 1024 * 1024, timeout=20)
+            if code == 0:
+                for r in json.loads(out):
+                    if isinstance(r, dict) and isinstance(r.get("name"), str):
+                        repos[(owner.lower(), r["name"].lower())] = r
+        except Exception as e:
+            sys.stderr.write(f"Warning: Failed to fetch GitHub repos for '{owner}': {e}\n")
+    return repos
+
+
+def discover_plugins(account, catalog, issues=None, orgs=()):
+    """Plugins listed in the marketplace whose repository belongs to `account` or one of its `orgs`
+    (each id once, at most MAX_TRACKED_PLUGINS)."""
+    wanted = {account.lower()} | {o.lower() for o in orgs}
     found = []
     for entry in unique_catalog(catalog):
         owner, repo_name = repo_owner(entry.get("repo"))
-        if not owner or owner.lower() != wanted:
+        if not owner or owner.lower() not in wanted:
             continue
         if len(found) >= MAX_TRACKED_PLUGINS:
             break
@@ -460,6 +485,7 @@ def discover_plugins(account, catalog, issues=None):
             "id": entry["id"],
             "name": str(entry.get("name") or entry["id"]),
             "repo_name": repo_name,
+            "repo_owner": owner,
             "repo_url": f"https://github.com/{owner}/{repo_name}",
             "display_icon": "plugin",
             "description": str(entry.get("description") or ""),
@@ -546,8 +572,9 @@ def query_metrics(author=None):
 
     stats = fetch_marketplace_stats()
     issues = fetch_marketplace_issues(author)
-    repos = fetch_github_repos(author)
-    tracked = discover_plugins(author, catalog, issues)
+    orgs = fetch_account_orgs(author)
+    repos = fetch_github_repos([author, *orgs])
+    tracked = discover_plugins(author, catalog, issues, orgs)
 
     # Load baseline acknowledged state
     ack_state = load_json_file(ack_file, fallback={})
@@ -574,7 +601,7 @@ def query_metrics(author=None):
         downloads = int(st.get("copies", 0))
         hearts = int(st.get("hearts", 0))
 
-        rp = repos.get(repo_name, {})
+        rp = repos.get((str(p.get("repo_owner") or author).lower(), repo_name.lower()), {})
         stars = int(rp.get("stargazerCount", p.get("catalog_stars", 0)) or 0)
         repo_url = p.get("repo_url")
         description = p.get("description") or rp.get("description", "")

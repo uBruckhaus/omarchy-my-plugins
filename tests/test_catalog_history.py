@@ -49,6 +49,27 @@ class DiscoveryTests(Isolated):
         self.assertEqual(found[0]["repo_name"], "omarchy-beta")
         self.assertEqual(monitor.discover_plugins("someone-else", CATALOG), [])
 
+    def test_plugins_in_the_accounts_organizations_count(self):
+        org_entry = {"id": "ubruckhaus.zeta", "name": "Zeta", "repo": "https://github.com/maprisma/omarchy-zeta",
+                     "listedAt": "2026-11-06T00:00:00Z"}
+        catalog = CATALOG + [org_entry]
+        self.assertNotIn("ubruckhaus.zeta", [p["id"] for p in monitor.discover_plugins("uBruckhaus", catalog)])
+        found = monitor.discover_plugins("uBruckhaus", catalog, orgs=["Maprisma"])
+        zeta = next(p for p in found if p["id"] == "ubruckhaus.zeta")
+        self.assertEqual((zeta["repo_owner"], zeta["repo_url"]), ("maprisma", "https://github.com/maprisma/omarchy-zeta"))
+        self.assertNotIn("other.gamma", [p["id"] for p in found])
+
+    def test_organizations_only_for_the_logged_in_account(self):
+        calls = []
+        def fake(args, **_kw):
+            calls.append(args)
+            return 0, "maprisma\nbad org\n"
+        with patch("monitor.gh_login", return_value="someone-else"), patch("monitor.run_bounded", side_effect=fake):
+            self.assertEqual(monitor.fetch_account_orgs("uBruckhaus"), [])
+        self.assertEqual(calls, [])
+        with patch("monitor.gh_login", return_value="ubruckhaus"), patch("monitor.run_bounded", side_effect=fake):
+            self.assertEqual(monitor.fetch_account_orgs("uBruckhaus"), ["maprisma"])
+
     def test_account_validation(self):
         for good in ("uBruckhaus", "a", "a-b-c", "x" * 39):
             self.assertTrue(monitor.valid_account(good), good)
@@ -74,7 +95,8 @@ class DiscoveryTests(Isolated):
     def test_query_uses_catalog_stats_and_records_history(self):
         stats = {"ubruckhaus.alpha": {"views": 10, "copies": 2, "hearts": 1}, "other.gamma": {"views": 99}}
         with patch("monitor.fetch_marketplace_stats", return_value=stats), patch("monitor.fetch_catalog", return_value=CATALOG), \
-             patch("monitor.fetch_marketplace_issues", return_value=[]), patch("monitor.fetch_github_repos", return_value={}):
+             patch("monitor.fetch_marketplace_issues", return_value=[]), patch("monitor.fetch_github_repos", return_value={}), \
+             patch("monitor.fetch_account_orgs", return_value=[]):
             result = monitor.query_metrics(author="uBruckhaus")
         self.assertEqual(result["total_views"], 10)
         self.assertEqual({p["id"] for p in result["plugins"]}, {"ubruckhaus.alpha", "ubruckhaus.beta"})
