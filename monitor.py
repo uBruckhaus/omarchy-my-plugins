@@ -128,6 +128,8 @@ def load_config():
         try:
             with open(cfg_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
+                if not isinstance(data, dict):
+                    raise ValueError("config is not an object")
                 if "author" not in data:
                     data["author"] = DEFAULT_AUTHOR
                 if data.get("sort_by") not in SORT_FIELDS:
@@ -156,13 +158,34 @@ def save_config(cfg):
         os.replace(tmp_file, cfg_file)
 
 def load_json_file(path, fallback=None):
+    """A JSON object from one of our state files; `fallback` if missing, unreadable or not an object."""
     if not path.is_file():
         return fallback
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        return data if isinstance(data, dict) else fallback
     except Exception:
         return fallback
+
+
+def as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def issue_record(issue):
+    """One `gh issue list` item with the fields determine_status reads, each of the expected type; None if unusable."""
+    if not isinstance(issue, dict):
+        return None
+    labels = issue.get("labels")
+    names = [l["name"][:100] for l in labels if isinstance(l, dict) and isinstance(l.get("name"), str)][:50] \
+        if isinstance(labels, list) else []
+    text = lambda key, limit: issue[key][:limit] if isinstance(issue.get(key), str) else ""
+    number = issue.get("number")
+    return {"number": number if isinstance(number, int) and not isinstance(number, bool) and number > 0 else None,
+            "title": text("title", 500), "body": text("body", 20000), "state": text("state", 20),
+            "labels": [{"name": n} for n in names], "url": text("url", 300),
+            "createdAt": text("createdAt", 40), "closedAt": text("closedAt", 40), "updatedAt": text("updatedAt", 40)}
 
 def save_json_file(path, data):
     tmp = path.with_suffix(".tmp")
@@ -449,7 +472,7 @@ def fetch_marketplace_issues(account):
             limit=16 * 1024 * 1024, timeout=20)
         if code == 0:
             issues = json.loads(out)
-            return issues if isinstance(issues, list) else []
+            return [r for r in map(issue_record, issues if isinstance(issues, list) else []) if r]
     except Exception as e:
         sys.stderr.write(f"Warning: Failed to fetch marketplace issues for '{account}': {e}\n")
     return []
@@ -606,7 +629,7 @@ def query_metrics(author=None):
 
     # Load baseline acknowledged state
     ack_state = load_json_file(ack_file, fallback={})
-    ack_plugins = ack_state.get("plugins_map", {})
+    ack_plugins = as_dict(ack_state.get("plugins_map"))
 
     plugins_result = []
     total_views = 0
@@ -647,12 +670,12 @@ def query_metrics(author=None):
         total_hearts += hearts
         total_stars += stars
 
-        ack_p = ack_plugins.get(pid, {})
-        ack_views = ack_p.get("views", views)
-        ack_downloads = ack_p.get("downloads", downloads)
-        ack_hearts = ack_p.get("hearts", hearts)
-        ack_stars = ack_p.get("stars", stars)
-        ack_status = ack_p.get("status_text", status_text)
+        ack_p = as_dict(ack_plugins.get(pid))
+        ack_views = count(ack_p.get("views"), views)
+        ack_downloads = count(ack_p.get("downloads"), downloads)
+        ack_hearts = count(ack_p.get("hearts"), hearts)
+        ack_stars = count(ack_p.get("stars"), stars)
+        ack_status = ack_p.get("status_text") if isinstance(ack_p.get("status_text"), str) else status_text
 
         views_delta = max(0, views - ack_views)
         downloads_delta = max(0, downloads - ack_downloads)
@@ -859,7 +882,7 @@ def acknowledge_changes(author=None):
     if not data:
         data = query_metrics(author=author)
 
-    plugins_map = data.get("plugins_map", {})
+    plugins_map = as_dict(data.get("plugins_map"))
     now_iso = datetime.now(timezone.utc).isoformat()
     save_json_file(ack_file, {
         "acknowledged_at": now_iso,
@@ -869,7 +892,9 @@ def acknowledge_changes(author=None):
     # Clear changes from snapshot
     data["has_changes"] = False
     data["changes_summary"] = ""
-    for p in data.get("plugins", []):
+    for p in data.get("plugins") if isinstance(data.get("plugins"), list) else []:
+        if not isinstance(p, dict):
+            continue
         p["has_changes"] = False
         p["views_delta"] = 0
         p["downloads_delta"] = 0
@@ -927,7 +952,7 @@ def apply_sort(data):
     cfg = load_config()
     sort_by = cfg.get("sort_by") or data.get("sort_by") or DEFAULT_SORT_BY
     sort_order = cfg.get("sort_order") or data.get("sort_order") or DEFAULT_SORT_ORDER
-    data["plugins"] = sort_plugins(data["plugins"], sort_by, sort_order)
+    data["plugins"] = sort_plugins([p for p in data["plugins"] if isinstance(p, dict)], sort_by, sort_order)
     data["sort_by"] = sort_by
     data["sort_order"] = sort_order
     return data

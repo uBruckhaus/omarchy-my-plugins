@@ -121,6 +121,30 @@ class DiscoveryTests(Isolated):
         self.assertEqual({p["id"]: (p["views"], p["stars"]) for p in result["plugins"]},
                          {"ubruckhaus.alpha": (0, 0), "ubruckhaus.beta": (0, 0)})
 
+    def test_malformed_issue_records_do_not_abort_a_refresh(self):
+        out = json.dumps(["junk", None, {"title": None, "labels": None}, {"title": ["x"], "labels": "listed"},
+                          {"number": True, "title": "[Verify]: Alpha 1.1", "state": "OPEN",
+                           "labels": [None, {"name": 5}, {"name": "security-review-required"}], "url": 7}])
+        with patch("monitor.run_bounded", return_value=(0, out)):
+            issues = monitor.fetch_marketplace_issues("uBruckhaus")
+        self.assertEqual(len(issues), 3)
+        self.assertEqual(issues[2]["labels"], [{"name": "security-review-required"}])
+        self.assertEqual((issues[2]["number"], issues[2]["url"]), (None, ""))
+        status = monitor.determine_status({"name": "Alpha", "id": "ubruckhaus.alpha", "repo_name": "omarchy-alpha"}, issues)
+        self.assertEqual(status[1], "review")
+
+    def test_state_files_of_the_wrong_shape_are_ignored(self):
+        state = monitor.get_state_dir()
+        for name, text in (("catalog.json", "[1, 2]"), ("acknowledged.json", '{"plugins_map": {"ubruckhaus.alpha": "x"}}'),
+                           ("history.json", '"text"')):
+            (state / name).write_text(text)
+        self.assertIsNone(monitor.load_json_file(state / "catalog.json"))
+        with patch("monitor.fetch_marketplace_stats", return_value={}), patch("monitor.http_get", side_effect=OSError("offline")), \
+             patch("monitor.fetch_marketplace_issues", return_value=[]), patch("monitor.fetch_github_repos", return_value={}), \
+             patch("monitor.fetch_account_orgs", return_value=[]):
+            result = monitor.query_metrics(author="uBruckhaus")
+        self.assertEqual(result["plugins"], [])
+
     def test_account_validation(self):
         for good in ("uBruckhaus", "a", "a-b-c", "x" * 39):
             self.assertTrue(monitor.valid_account(good), good)
