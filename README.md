@@ -38,10 +38,12 @@ rm -r ~/.config/omarchy/my-plugins ~/.local/state/omarchy/my-plugins   # setting
 
 ## Privacy and network
 
-My Plugins only reads public data: the marketplace catalog
+My Plugins reads only: the marketplace catalog
 (`raw.githubusercontent.com/omacom/omarchy-plugin-marketplace/main/site/catalog.json`, cached and
 re-checked at most hourly), the marketplace stats API (`api.omarchyplugins.com/v1/stats`) and, through
-your own `gh` login, your repositories and your marketplace issues. Every download and helper output has
+your own `gh` login, the repositories that hold your listed plugins, your marketplace issues and the
+list of GitHub organizations you belong to (`gh api user/orgs`, which can include private memberships;
+it is only used to match catalog entries and is not stored). Every download and helper output has
 a size cap and an overall deadline, redirects are refused, and links open only for `github.com` and
 `plugins.omarchy.org`. Nothing is sent anywhere; settings, the catalog cache and the history stay in
 `~/.config/omarchy/my-plugins` and `~/.local/state/omarchy/my-plugins`.
@@ -93,7 +95,8 @@ every plugin in the marketplace catalog whose repository belongs to that account
 developer can use it. Leave the field empty to use the account `gh` is logged into.
 When `gh` is logged into that same account, plugins in repositories of the GitHub organizations
 it belongs to count too (e.g. `github.com/maprisma/omarchy-maprisma-launcher`), read with
-`gh api user/orgs`.
+`gh api user/orgs`. The review status of every card comes from marketplace issues opened by your
+account; a review started by another member of the organization is not shown.
 
 Data sources: the marketplace catalog (`site/catalog.json` of `omacom/omarchy-plugin-marketplace`,
 cached and refreshed at most hourly with ETag), the marketplace stats API (views, downloads, hearts),

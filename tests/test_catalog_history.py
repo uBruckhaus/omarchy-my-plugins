@@ -70,6 +70,41 @@ class DiscoveryTests(Isolated):
         with patch("monitor.gh_login", return_value="ubruckhaus"), patch("monitor.run_bounded", side_effect=fake):
             self.assertEqual(monitor.fetch_account_orgs("uBruckhaus"), ["maprisma"])
 
+    def test_star_lookups_share_one_deadline(self):
+        calls = []
+        def slow(args, **kw):
+            calls.append((args[3], kw["timeout"]))
+            monitor.time.sleep(0.6)
+            return 0, json.dumps([{"name": "Repo", "stargazerCount": 5}])
+        with patch("monitor.run_bounded", side_effect=slow):
+            repos = monitor.fetch_github_repos(["a", "b", "c", "d"], budget=1.5)
+        self.assertEqual([c[0] for c in calls], ["a"])            # b would start with < 1 s left
+        self.assertLessEqual(calls[0][1], 1.5)
+        self.assertEqual(repos, {("a", "repo"): {"name": "Repo", "stargazerCount": 5}})
+
+    def test_stars_are_read_per_owner(self):
+        catalog = [{"id": "ubruckhaus.alpha", "name": "Alpha", "repo": "https://github.com/uBruckhaus/same"},
+                   {"id": "ubruckhaus.zeta", "name": "Zeta", "repo": "https://github.com/maprisma/same"}]
+        repos = {("ubruckhaus", "same"): {"stargazerCount": 1}, ("maprisma", "same"): {"stargazerCount": 9}}
+        asked = []
+        def fake_repos(owners):
+            asked.append(list(owners))
+            return repos
+        with patch("monitor.fetch_marketplace_stats", return_value={}), patch("monitor.fetch_catalog", return_value=catalog), \
+             patch("monitor.fetch_marketplace_issues", return_value=[]), patch("monitor.fetch_github_repos", side_effect=fake_repos), \
+             patch("monitor.fetch_account_orgs", return_value=["maprisma", "unrelated-org"]):
+            result = monitor.query_metrics(author="uBruckhaus")
+        self.assertEqual(asked, [["ubruckhaus", "maprisma"]])     # no look-up for orgs without listed plugins
+        self.assertEqual({p["id"]: p["stars"] for p in result["plugins"]}, {"ubruckhaus.alpha": 1, "ubruckhaus.zeta": 9})
+
+    def test_many_organizations_are_all_matched(self):
+        orgs = [f"org{i}" for i in range(60)]
+        with patch("monitor.gh_login", return_value="uBruckhaus"), \
+             patch("monitor.run_bounded", return_value=(0, "\n".join(orgs))):
+            self.assertEqual(monitor.fetch_account_orgs("uBruckhaus"), orgs)
+        catalog = [{"id": "ubruckhaus.last", "name": "Last", "repo": "https://github.com/org59/last"}]
+        self.assertEqual([p["id"] for p in monitor.discover_plugins("uBruckhaus", catalog, orgs=orgs)], ["ubruckhaus.last"])
+
     def test_account_validation(self):
         for good in ("uBruckhaus", "a", "a-b-c", "x" * 39):
             self.assertTrue(monitor.valid_account(good), good)

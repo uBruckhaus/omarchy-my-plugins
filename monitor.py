@@ -434,33 +434,39 @@ def fetch_marketplace_issues(account):
     return []
 
 
-MAX_ORGS = 20
+REPOS_BUDGET = 30   # seconds for all live star look-ups of one refresh together
 
 
 def fetch_account_orgs(account):
     """GitHub organizations `account` belongs to, so plugins kept in an org repository count as its own.
-    Membership is often private, so this asks gh's logged-in user and only when that user is `account`."""
+    Membership is often private, so this asks gh's logged-in user and only when that user is `account`.
+    Only organizations that own a listed plugin are used afterwards (see discover_plugins)."""
     try:
         if gh_login().lower() != account.lower():
             return []
-        code, out = run_bounded(["gh", "api", "user/orgs", "--jq", ".[].login"], limit=64 * 1024, timeout=8)
+        code, out = run_bounded(["gh", "api", "user/orgs", "--paginate", "--jq", ".[].login"], limit=256 * 1024, timeout=8)
         if code != 0:
             return []
-        orgs = [o.strip() for o in out.splitlines() if valid_account(o.strip())]
-        return orgs[:MAX_ORGS]
+        return [o.strip() for o in out.splitlines() if valid_account(o.strip())]
     except Exception:
         return []
 
 
-def fetch_github_repos(owners):
-    """Live star counts: {(owner, repo name) lowercased: {stargazerCount, url, description}} (the catalog refreshes daily)."""
+def fetch_github_repos(owners, budget=REPOS_BUDGET):
+    """Live star counts: {(owner, repo name) lowercased: {stargazerCount, url, description}} (the catalog refreshes daily).
+    All owners share one deadline; owners not reached in time keep the catalog's star count."""
     if isinstance(owners, str):
         owners = [owners]
+    deadline = time.monotonic() + budget
     repos = {}
     for owner in owners:
+        remaining = deadline - time.monotonic()
+        if remaining < 1:
+            sys.stderr.write("Warning: GitHub star look-ups took too long; using catalog stars for the rest\n")
+            break
         try:
             code, out = run_bounded(["gh", "repo", "list", owner, "--limit", "300", "--json", "name,description,stargazerCount,url"],
-                                    limit=4 * 1024 * 1024, timeout=20)
+                                    limit=4 * 1024 * 1024, timeout=min(20, remaining))
             if code == 0:
                 for r in json.loads(out):
                     if isinstance(r, dict) and isinstance(r.get("name"), str):
@@ -573,8 +579,9 @@ def query_metrics(author=None):
     stats = fetch_marketplace_stats()
     issues = fetch_marketplace_issues(author)
     orgs = fetch_account_orgs(author)
-    repos = fetch_github_repos([author, *orgs])
     tracked = discover_plugins(author, catalog, issues, orgs)
+    owners = list(dict.fromkeys(p["repo_owner"].lower() for p in tracked))   # only owners of found plugins, in order
+    repos = fetch_github_repos(owners)
 
     # Load baseline acknowledged state
     ack_state = load_json_file(ack_file, fallback={})
