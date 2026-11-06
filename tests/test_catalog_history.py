@@ -105,6 +105,22 @@ class DiscoveryTests(Isolated):
         catalog = [{"id": "ubruckhaus.last", "name": "Last", "repo": "https://github.com/org59/last"}]
         self.assertEqual([p["id"] for p in monitor.discover_plugins("uBruckhaus", catalog, orgs=orgs)], ["ubruckhaus.last"])
 
+    def test_count_rejects_odd_values(self):
+        for bad in ("invalid", "-3", "1e9", "", None, [], {}, True, float("nan"), float("inf"), -1, "9" * 40):
+            self.assertEqual(monitor.count(bad), 0, bad)
+        self.assertEqual((monitor.count(" 12 "), monitor.count(7.9), monitor.count(10 ** 20)), (12, 7, monitor.MAX_COUNT))
+
+    def test_hostile_numbers_do_not_abort_a_refresh(self):
+        catalog = [dict(CATALOG[0], stars="invalid"), dict(CATALOG[1], stars=[1])]
+        stats = {"ubruckhaus.alpha": {"views": "many", "copies": None, "hearts": {"x": 1}}, "ubruckhaus.beta": "junk"}
+        repos = {("ubruckhaus", "omarchy-alpha"): {"stargazerCount": "lots"}}
+        with patch("monitor.fetch_marketplace_stats", return_value=stats), patch("monitor.fetch_catalog", return_value=catalog), \
+             patch("monitor.fetch_marketplace_issues", return_value=[]), patch("monitor.fetch_github_repos", return_value=repos), \
+             patch("monitor.fetch_account_orgs", return_value=[]):
+            result = monitor.query_metrics(author="uBruckhaus")
+        self.assertEqual({p["id"]: (p["views"], p["stars"]) for p in result["plugins"]},
+                         {"ubruckhaus.alpha": (0, 0), "ubruckhaus.beta": (0, 0)})
+
     def test_account_validation(self):
         for good in ("uBruckhaus", "a", "a-b-c", "x" * 39):
             self.assertTrue(monitor.valid_account(good), good)

@@ -230,7 +230,7 @@ def http_get(url, limit, timeout=20, etag=None):
             return 304, b"", etag
         raise
     with resp:
-        if int(resp.headers.get("Content-Length") or 0) > limit:
+        if count(resp.headers.get("Content-Length")) > limit:
             raise ValueError("reply too large")
         chunks, size = [], 0
         while True:
@@ -250,6 +250,27 @@ def http_get(url, limit, timeout=20, etag=None):
             if len(body) > limit or decoder.unconsumed_tail:
                 raise ValueError("reply too large")
         return resp.status, body, resp.headers.get("ETag")
+
+
+MAX_COUNT = 10 ** 12
+
+
+def count(value, default=0):
+    """A non-negative whole number from catalog, stats, gh or cache data; `default` for anything else."""
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, str):
+        value = value.strip()
+        if not value.isdigit() or len(value) > 13:
+            return default
+        value = int(value)
+    if isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            return default
+        value = int(value)
+    if not isinstance(value, int) or value < 0:
+        return default
+    return min(value, MAX_COUNT)
 
 
 def valid_account(account):
@@ -404,7 +425,7 @@ def fetch_catalog(state_dir=None, now=None):
     cache_file = state_dir / "catalog.json"
     cache = load_json_file(cache_file, fallback={}) or {}
     now = now if now is not None else time.time()
-    if cache.get("plugins") and now - float(cache.get("fetched_at", 0)) < CATALOG_MAX_AGE:
+    if cache.get("plugins") and now - count(cache.get("fetched_at")) < CATALOG_MAX_AGE:
         return unique_catalog(cache["plugins"])
     try:
         status, body, etag = http_get(CATALOG_URL, CATALOG_LIMIT, timeout=60, etag=cache.get("etag") if cache.get("plugins") else None)
@@ -497,7 +518,7 @@ def discover_plugins(account, catalog, issues=None, orgs=()):
             "description": str(entry.get("description") or ""),
             "version": str(entry.get("version") or ""),
             "publish_date": str(entry.get("listedAt") or "")[:10],
-            "catalog_stars": int(entry.get("stars") or 0),
+            "catalog_stars": count(entry.get("stars")),
             "verified": entry.get("verificationStatus") == "verified",
         })
     found.sort(key=lambda x: x.get("publish_date") or "9999")
@@ -603,13 +624,14 @@ def query_metrics(author=None):
         repo_name = p.get("repo_name", "")
         icon = p.get("display_icon", "plugin")
 
-        st = stats.get(pid, {"views": 0, "copies": 0, "hearts": 0})
-        views = int(st.get("views", 0))
-        downloads = int(st.get("copies", 0))
-        hearts = int(st.get("hearts", 0))
+        st = stats.get(pid)
+        st = st if isinstance(st, dict) else {}
+        views = count(st.get("views"))
+        downloads = count(st.get("copies"))
+        hearts = count(st.get("hearts"))
 
         rp = repos.get((str(p.get("repo_owner") or author).lower(), repo_name.lower()), {})
-        stars = int(rp.get("stargazerCount", p.get("catalog_stars", 0)) or 0)
+        stars = count(rp.get("stargazerCount"), count(p.get("catalog_stars")))
         repo_url = p.get("repo_url")
         description = p.get("description") or rp.get("description", "")
         version = p.get("version", "")
@@ -743,7 +765,7 @@ def record_history(plugins_map, state_dir=None, today=None):
     history = load_json_file(path, fallback={}) or {}
     days = history.get("days") if isinstance(history.get("days"), dict) else {}
     day = (today or datetime.now().date()).isoformat()
-    days[day] = {pid: [int(v.get(m, 0)) for m in METRICS] for pid, v in plugins_map.items()}
+    days[day] = {pid: [count(v.get(m)) for m in METRICS] for pid, v in plugins_map.items() if isinstance(v, dict)}
     for old in sorted(days)[:-HISTORY_DAYS]:
         del days[old]
     with runtime_lock("my_plugins_history.lock"):

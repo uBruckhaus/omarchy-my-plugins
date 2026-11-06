@@ -41,7 +41,8 @@ rm -r ~/.config/omarchy/my-plugins ~/.local/state/omarchy/my-plugins   # setting
 My Plugins reads only: the marketplace catalog
 (`raw.githubusercontent.com/omacom/omarchy-plugin-marketplace/main/site/catalog.json`, cached and
 re-checked at most hourly), the marketplace stats API (`api.omarchyplugins.com/v1/stats`) and, through
-your own `gh` login, the repositories that hold your listed plugins, your marketplace issues and the
+your own `gh` login, the repository list (name, description, stars; up to 300, private ones
+included) of each account or organization that holds one of your listed plugins, your marketplace issues and the
 list of GitHub organizations you belong to (`gh api user/orgs`, which can include private memberships;
 it is only used to match catalog entries and is not stored). Every download and helper output has
 a size cap and an overall deadline, redirects are refused, and links open only for `github.com` and
