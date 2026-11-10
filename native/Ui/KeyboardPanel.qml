@@ -52,6 +52,8 @@ PanelWindow {
   property bool popoutSwitching: false
   property bool popoutSwitchClosing: false
   property bool focusPrimed: false
+  // Corners of the card (the panel's frame): Style.cornerRadius, which the Corners setting drives.
+  property real cardRadius: Style.cornerRadius
 
   // Item that should take keyboard focus once the panel maps. Typically a
   // PanelKeyCatcher inside the panel content. Layer-shell grants focus to the
@@ -405,7 +407,7 @@ PanelWindow {
     color: Commons.Color.popups.background
     borderSpec: root.borderSpec
     padding: root.padding
-    radius: Style.cornerRadius
+    radius: root.cardRadius
     opacity: root.open || root.popoutSwitching ? 1.0 : 0
 
     Behavior on opacity {

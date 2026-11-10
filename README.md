@@ -9,7 +9,23 @@ history chart. A pulsing dot on the bar icon tells you when something changed.
 
 The interface is built in in eight languages: English, German (Deutsch), French (Français), Spanish (Español), Italian (Italiano), Portuguese (Português), Dutch (Nederlands) and Polish (Polski). It follows the system language (`LC_ALL`, `LC_MESSAGES`, `LANG`) and falls back to English. To pick another one, open the **gear (⚙)** at the top right of the panel → **Language**. The translations ship with the plugin: nothing is downloaded or generated, and the plugin makes no extra requests for them. The choice is stored in the widget's own entry in `~/.config/omarchy/shell.json` (`"language"`); **System (…)** removes it again.
 
-The settings page opens from the gear and closes with **← Back**, Backspace or Esc. It also holds the **check interval** and the **GitHub account** whose plugins are shown, which used to be in the main panel. The history page has the same **← Back** header.
+The settings page opens from the gear and closes with **← Back**, Backspace or Esc. Besides **Language** it has:
+
+- **Corners:** *Like windows (… px)* (the default) follows Hyprland's window rounding (`decoration:rounding`, as the shell reads it), *Slightly rounded (6 px)*, *Rounded (12 px)* or *Square*. This panel draws its own frame, so the setting rounds all of it: the frame, tool tips, drop-down lists and the cards (banner, totals, sort, history, settings and plugin cards) at the full radius; buttons, drop-downs, the account field, the publish date badge and the note field at most 8 px; the +views/+downloads badges and the chart's bars at most 4 px; the account chip, the status pill, switches and the resize grip round, or square in *Square*. Only the bar icon keeps its own drawing. Stored as `"corners"` in the widget's entry in `~/.config/omarchy/shell.json`; *Like windows* removes it again.
+- **F12 saves a screenshot** (on by default; stored as `"screenshotKey": false` when switched off, see below).
+- The **check interval** and the **GitHub account** whose plugins are shown, which used to be in the main panel.
+
+The history page has the same **← Back** header.
+
+### F12: a screenshot of the panel, with a note
+
+While the panel is open, **F12** (without Ctrl, Shift, Alt or Super) saves a picture of the panel, for telling what is wrong with it, as in the author's GTK apps:
+
+- **Only on F12.** Nothing is captured at any other time, and only the panel itself: Qt draws the panel's own content into the picture (`grabToImage`). No screen capture tool runs, nothing else on the screen is in it, and nothing is uploaded or sent anywhere.
+- **Where:** `~/Pictures/My Plugins/my-plugins-<date>-<time>.png` (the pictures folder from `~/.config/user-dirs.dirs` when it is set there). A panel then names the file and asks **What is wrong? (optional)**; **Enter** or **Done** saves the text next to the picture as a `.txt` with the same name (at most 4000 characters; no text, no file), **Esc** skips it, and closing the panel keeps what was typed.
+- **Private files:** the folder is made `0700` when missing and only used when it is a real folder (not a link) of yours that no one else can write to; pictures and notes are new `0600` files, never written through a link or over an existing file (`-2`, `-3` … are added instead), and a picture that cannot be written completely is removed again.
+- **How:** the panel first writes the picture into its own folder `$XDG_RUNTIME_DIR/ubruckhaus.my-plugins-shot/` (`0700`, in memory, cleared after ten minutes at the latest). `shot_save.py` (Python standard library) is then started with a fixed argument list, never through a shell: `prepare <plugin id>`, `save <picture> "My Plugins"` (checks that the picture is a regular file of yours in that folder, at most 32 MiB and a PNG, copies it as above and removes it), and `note <picture> "My Plugins"` with the note on its standard input. Each call answers with one line of JSON.
+- **Off:** switch **F12 saves a screenshot** off on the settings page; F12 then does nothing in this panel.
 
 The **ⓘ** button beside the gear opens an **Information** page with a card for each of the author's other plugins in the Omarchy Plugin Marketplace, with a short description in the panel's language. A click on a card opens that plugin's marketplace page in the browser (a fixed `https://plugins.omarchy.org/plugin.html?id=…` address); nothing is downloaded. **← Back**, Backspace or Esc returns. The refresh button in the header is now a symbol (↻; an hourglass while a check runs), like the gear.
 
@@ -37,6 +53,8 @@ omarchy plugin remove ubruckhaus.my-plugins
 rm -r ~/.config/omarchy/my-plugins ~/.local/state/omarchy/my-plugins   # settings, cache and history (optional)
 ```
 
+Screenshots you took with F12 stay in `~/Pictures/My Plugins/` until you delete them.
+
 ## Privacy and network
 
 My Plugins reads only: the marketplace catalog
@@ -48,7 +66,7 @@ list of GitHub organizations you belong to (`gh api user/orgs`, which can includ
 it is only used to match catalog entries and is not stored). Every download and helper output has
 a size cap and an overall deadline, redirects are refused, and links open only for `github.com` and
 `plugins.omarchy.org`. Nothing is sent anywhere; settings, the catalog cache and the history stay in
-`~/.config/omarchy/my-plugins` and `~/.local/state/omarchy/my-plugins`.
+`~/.config/omarchy/my-plugins` and `~/.local/state/omarchy/my-plugins`. F12 pictures and notes (see above) stay in `~/Pictures/My Plugins/`.
 
 ---
 
@@ -158,6 +176,8 @@ The default sort order is **views, descending** — the plugin list is always or
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+`PanelShot.qml`, `shot_save.py` (with `tests/test_shot_save.py`), `corners.js`, `KeyTextField.qml`, `CompactDropdown.qml` and the shared texts in `I18n.js` come from the author's shared plugin kit and are the same in his other panels. The vendored controls in `native/` take their corners from the **Corners** setting (see `native/README.md`).
 
 ---
 

@@ -70,7 +70,7 @@ Item {
     anchors.fill: parent
     visible: root.cursorRing && root.hot
     color: "transparent"
-    radius: Style.cornerRadius
+    radius: Style.controlRadius
     borderSpec: Border.controlSpec("hover-cursor", root.foreground, root.accent)
   }
 

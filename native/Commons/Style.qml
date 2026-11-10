@@ -29,7 +29,13 @@ import "." as Commons
 QtObject {
   id: root
 
+  // Corners (the plugin's "Corners" setting drives cornerRadius through a Binding in its
+  // BarWidget; qml/corners.js in omarchy-plugin-i18n): cornerRadius for the panel frame,
+  // cards, pop-ups and tool tips; controlRadius for buttons, drop-downs, fields and toggle
+  // rows; smallRadius for tracks, badges and swatches. Square makes all of them 0.
   property int cornerRadius: 0
+  readonly property int controlRadius: Math.min(cornerRadius, 8)
+  readonly property int smallRadius: Math.min(cornerRadius, 4)
   property int gapsOut: 5
 
   // ---------------------------------------------------------- state tokens

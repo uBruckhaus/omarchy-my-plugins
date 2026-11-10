@@ -19,6 +19,10 @@ import "../Commons" as Commons
 Item {
   id: root
 
+  // Corners: the trigger is a control, the open list a pop-up (Style's Corners sizes).
+  property real controlRadius: Style.controlRadius
+  property real popupRadius: Style.cornerRadius
+
   property string label: ""
   property string value: ""
   property var options: []
@@ -85,7 +89,7 @@ Item {
       id: trigger
       width: parent.width
       height: root.rowHeight
-      radius: Style.cornerRadius
+      radius: root.controlRadius
 
       readonly property bool _focused: trigger.activeFocus
       readonly property bool _hot: triggerHover.hovered || root.hasCursor
@@ -162,7 +166,7 @@ Item {
         background: BorderSurface {
           color: root.background
           borderSpec: root.popupBorderSpec
-          radius: Style.cornerRadius
+          radius: root.popupRadius
         }
 
         onOpened: {

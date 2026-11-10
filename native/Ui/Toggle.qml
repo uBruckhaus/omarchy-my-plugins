@@ -45,7 +45,7 @@ BorderSurface {
 
   implicitHeight: Math.max(54, content.implicitHeight + Style.spacing.huge)
   implicitWidth: Style.space(240)
-  radius: Style.cornerRadius
+  radius: Style.controlRadius
 
   readonly property bool _hot: hasCursor || mouse.containsMouse
   readonly property var _borderSpec: Border.controlSpec(activeFocus ? "focus" : (_hot ? "hover-cursor" : "normal"), foreground, accent)

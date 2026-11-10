@@ -63,7 +63,7 @@ Column {
     background: BorderSurface {
       color: Style.controlFill(spin._focused, spin._hot, root.foreground, root.accent)
       borderSpec: spin._borderSpec
-      radius: Style.cornerRadius
+      radius: Style.controlRadius
 
       HoverHandler {
         onHoveredChanged: {

@@ -73,7 +73,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         color: "transparent"
         borderSpec: Border.controlSpec("normal", root.foreground, Commons.Color.accent)
-        radius: Style.cornerRadius
+        radius: Style.controlRadius
 
         Text {
           id: detailText

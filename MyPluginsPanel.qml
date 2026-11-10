@@ -5,6 +5,7 @@ import "native/Commons"
 import "native/Commons" as Commons
 import "native/Ui" as Ui
 import "I18n.js" as I18n
+import "corners.js" as Corners
 
 Ui.Panel {
     id: root
@@ -28,6 +29,15 @@ Ui.Panel {
     readonly property string languageSetting: hostWidget ? hostWidget.languageSetting : "auto"
     readonly property string systemLang: hostWidget ? hostWidget.systemLang : "en"
     function t(key, args) { return I18n.tr(lang, key, args) }
+    // Corners (radius: frame, cards, pop-ups; control: buttons, drop-downs, fields; small:
+    // badges, chart bars; pill: round chips and grips, square in Square) and the F12 screenshot
+    // key, from the widget's shell.json entry. The vendored controls follow through
+    // native/Commons/Style (the widget binds Style.cornerRadius to corners.radius).
+    // (Defaults also while a shell still runs a BarWidget from before these settings.)
+    readonly property string cornersSetting: hostWidget && hostWidget.cornersSetting !== undefined ? hostWidget.cornersSetting : "windows"
+    readonly property var corners: hostWidget && hostWidget.corners ? hostWidget.corners : Corners.sizes(cornersSetting, Style.cornerRadius)
+    readonly property bool screenshotKey: hostWidget && hostWidget.screenshotKey !== undefined ? hostWidget.screenshotKey !== false : true
+    readonly property real settingsLabelWidth: Style.space(130)
     function tn(key, n, args) { return I18n.trn(lang, key, n, args) }
     onSettingsOpenChanged: { panelScroll.contentY = 0; if (settingsOpen) showHistory = false; content.forceActiveFocus() }
     // Without an account there is nothing to show: start on the settings page.
@@ -97,9 +107,29 @@ Ui.Panel {
         readonly property int savedHeight: root.hostWidget ? root.hostWidget.panelHeight : 0
         property real dragHeight: -1
         readonly property real minHeight: Style.space(220)
-        contentHeight: dragHeight > 0 ? cappedContentHeight(Math.max(minHeight, dragHeight))
+        // At least as tall as the screenshot note overlay while it shows.
+        contentHeight: Math.max(dragHeight > 0 ? cappedContentHeight(Math.max(minHeight, dragHeight))
                      : savedHeight > 0 ? cappedContentHeight(Math.max(minHeight, savedHeight))
-                     : fittedContentHeight(content.implicitHeight, Style.space(660))
+                     : fittedContentHeight(content.implicitHeight, Style.space(660)),
+                     shot.neededHeight > 0 ? fittedContentHeight(shot.neededHeight) : 0)
+
+        // F12: a screenshot of this panel into ~/Pictures/My Plugins, then an optional note
+        // (PanelShot.qml, shared). The keys the panel's own handlers leave alone (F12 has no
+        // handler here; the account field passes it on) come up to it; while its overlay shows
+        // they are off.
+        PanelShot {
+            id: shot
+            anchors.fill: parent
+            pluginId: "ubruckhaus.my-plugins"
+            folderName: "My Plugins"
+            active: root.screenshotKey
+            panelOpen: root.opened
+            returnFocus: content
+            lang: root.lang
+            fg: Commons.Color.foreground
+            dim: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.65)
+            fontFamily: Style.font.family
+            corners: root.corners
 
         Flickable {
             id: panelScroll
@@ -115,6 +145,8 @@ Ui.Panel {
                 width: parent.width
                 focus: root.opened
                 spacing: Style.space(12)
+                // Off while the screenshot note overlay shows: typing there must reach its field.
+                Keys.enabled: !shot.overlayOpen
                 // Esc and Backspace leave the history or settings page first (text fields keep their own Backspace).
                 Keys.onEscapePressed: { if (root.showHistory || root.settingsOpen || root.infoOpen) root.back(); else root.close() }
                 Keys.onPressed: function(event) {
@@ -149,7 +181,7 @@ Ui.Panel {
                                 Rectangle {
                                     height: Style.space(16)
                                     width: authorBadgeText.implicitWidth + Style.space(8)
-                                    radius: Style.space(8)
+                                    radius: Math.min(root.corners.pill, height / 2)
                                     color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.15)
                                     anchors.verticalCenter: parent.verticalCenter
                                     Text { textFormat: Text.PlainText;
@@ -235,6 +267,8 @@ Ui.Panel {
                         lang: root.lang
                         fg: Commons.Color.foreground
                         fontFamily: Style.font.family
+                        cardRadius: root.corners.radius
+                        tileRadius: root.corners.control
                         onOpened: root.close()
                     }
                 }
@@ -252,7 +286,7 @@ Ui.Panel {
                     Ui.PanelSeparator { width: parent.width }
                     Row {
                         spacing: Style.space(10)
-                        Text { id: languageLabel; textFormat: Text.PlainText; width: Style.space(90); text: root.t("language"); color: Commons.Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; anchors.verticalCenter: parent.verticalCenter }
+                        Text { id: languageLabel; textFormat: Text.PlainText; width: root.settingsLabelWidth; wrapMode: Text.WordWrap; text: root.t("language"); color: Commons.Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; anchors.verticalCenter: parent.verticalCenter }
                         CompactDropdown {
                             id: languagePicker
                             anchors.verticalCenter: parent.verticalCenter
@@ -262,6 +296,8 @@ Ui.Panel {
                             fontSize: Style.font.caption
                             rowHeight: languageLabel.implicitHeight + Style.space(6)
                             popupRowHeight: languageLabel.implicitHeight + Style.space(8)
+                            controlRadius: root.corners.control
+                            popupRadius: root.corners.radius
                             options: [{ value: "auto", label: root.t("systemLanguage", [I18n.languageName(root.systemLang)]) }]
                                 .concat(I18n.LANGUAGES.map(function(l) { return { value: l.code, label: l.name } }))
                             value: root.languageSetting
@@ -272,11 +308,60 @@ Ui.Panel {
                             }
                         }
                     }
+
+                    // Corners of the panel, its cards and controls; "Like windows" is Hyprland's rounding.
+                    Column {
+                        width: parent.width
+                        spacing: Style.space(4)
+                        Row {
+                            spacing: Style.space(10)
+                            Text { id: cornersLabel; textFormat: Text.PlainText; width: root.settingsLabelWidth; wrapMode: Text.WordWrap; text: root.t("corners"); color: Commons.Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; anchors.verticalCenter: parent.verticalCenter }
+                            CompactDropdown {
+                                id: cornersPicker
+                                anchors.verticalCenter: parent.verticalCenter
+                                showLabel: false
+                                width: fitWidth
+                                fontSize: Style.font.caption
+                                rowHeight: cornersLabel.implicitHeight + Style.space(6)
+                                popupRowHeight: cornersLabel.implicitHeight + Style.space(8)
+                                controlRadius: root.corners.control
+                                popupRadius: root.corners.radius
+                                options: Corners.options(root.t, root.hostWidget && root.hostWidget.windowsRadius !== undefined ? root.hostWidget.windowsRadius : 0)
+                                value: root.cornersSetting
+                                onChanged: function(picked) {
+                                    if (root.hostWidget && typeof root.hostWidget.setCorners === "function") root.hostWidget.setCorners(picked)
+                                    cornersPicker.value = Qt.binding(function() { return root.cornersSetting })
+                                }
+                            }
+                        }
+                        Text { x: root.settingsLabelWidth + Style.space(10); width: parent.width - x; textFormat: Text.PlainText; text: root.t("cornersHint"); wrapMode: Text.WordWrap; color: Commons.Color.foreground; opacity: 0.65; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                    }
+
+                    // F12 saves a screenshot of this panel (PanelShot.qml); on by default.
+                    Column {
+                        width: parent.width
+                        spacing: Style.space(4)
+                        Item {
+                            width: parent.width
+                            height: Math.max(shotLabel.implicitHeight, shotToggle.implicitHeight)
+                            Text { id: shotLabel; textFormat: Text.PlainText; width: root.settingsLabelWidth; wrapMode: Text.WordWrap; text: root.t("shotKey"); color: Commons.Color.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; anchors.verticalCenter: parent.verticalCenter }
+                            Ui.ToggleSwitch {
+                                id: shotToggle
+                                x: root.settingsLabelWidth + Style.space(10)
+                                anchors.verticalCenter: parent.verticalCenter
+                                cursorRing: false
+                                rounded: root.corners.pill > 0
+                                checked: root.screenshotKey
+                                onToggled: if (root.hostWidget && typeof root.hostWidget.setScreenshotKey === "function") root.hostWidget.setScreenshotKey(!root.screenshotKey)
+                            }
+                        }
+                        Text { x: root.settingsLabelWidth + Style.space(10); width: parent.width - x; textFormat: Text.PlainText; text: root.t("shotKeyHint", ["My Plugins"]); wrapMode: Text.WordWrap; color: Commons.Color.foreground; opacity: 0.65; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                    }
                     // Query Interval Configuration Strip
                     Rectangle {
                         width: parent.width
                         height: Style.space(42)
-                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        radius: root.corners.radius
                         color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.05)
                         border.width: 1
                         border.color: Commons.Color.popups.border
@@ -318,7 +403,7 @@ Ui.Panel {
                     Rectangle {
                         width: parent.width
                         height: accountColumn.implicitHeight + Style.space(16)
-                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        radius: root.corners.radius
                         color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.08)
                         border.width: 1
                         border.color: Commons.Color.accent
@@ -349,7 +434,7 @@ Ui.Panel {
                     Rectangle {
                         width: parent.width
                         height: bannerCol.implicitHeight + Style.space(16)
-                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        radius: root.corners.radius
                         visible: root.hasChanges
                         color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.12)
                         border.width: 1
@@ -416,7 +501,7 @@ Ui.Panel {
                         Rectangle {
                             width: (parent.width - Style.space(24)) / 4
                             height: Style.space(52)
-                            radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                            radius: root.corners.radius
                             color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.07)
                             border.width: 1
                             border.color: Commons.Color.popups.border
@@ -445,7 +530,7 @@ Ui.Panel {
                         Rectangle {
                             width: (parent.width - Style.space(24)) / 4
                             height: Style.space(52)
-                            radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                            radius: root.corners.radius
                             color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.07)
                             border.width: 1
                             border.color: Commons.Color.popups.border
@@ -474,7 +559,7 @@ Ui.Panel {
                         Rectangle {
                             width: (parent.width - Style.space(24)) / 4
                             height: Style.space(52)
-                            radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                            radius: root.corners.radius
                             color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.07)
                             border.width: 1
                             border.color: Commons.Color.popups.border
@@ -503,7 +588,7 @@ Ui.Panel {
                         Rectangle {
                             width: (parent.width - Style.space(24)) / 4
                             height: Style.space(52)
-                            radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                            radius: root.corners.radius
                             color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.07)
                             border.width: 1
                             border.color: Commons.Color.popups.border
@@ -539,7 +624,7 @@ Ui.Panel {
                     Rectangle {
                         width: parent.width
                         height: sortRow.implicitHeight + Style.space(16)
-                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        radius: root.corners.radius
                         color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.05)
                         border.width: 1
                         border.color: Commons.Color.popups.border
@@ -645,7 +730,7 @@ Ui.Panel {
                         delegate: Rectangle {
                             width: parent.width
                             height: cardColumn.implicitHeight + Style.space(16)
-                            radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                            radius: root.corners.radius
                             color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.06)
                             border.width: 1
                             border.color: modelData.has_changes ? Commons.Color.accent : Commons.Color.popups.border
@@ -670,7 +755,7 @@ Ui.Panel {
                                         Rectangle {
                                             width: Style.space(92)
                                             height: Style.space(22)
-                                            radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 4)
+                                            radius: root.corners.control
                                             color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.08)
                                             border.width: 1
                                             border.color: Commons.Color.popups.border
@@ -731,7 +816,7 @@ Ui.Panel {
                                         Rectangle {
                                             height: Style.space(20)
                                             width: statusText.implicitWidth + Style.space(12)
-                                            radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 10)
+                                            radius: Math.min(root.corners.pill, height / 2)
                                             color: {
                                                 var sc = modelData.status_code
                                                 if (sc === "verified" || sc === "published" || sc === "listed") return Qt.rgba(0.2, 0.8, 0.4, 0.15)
@@ -816,7 +901,7 @@ Ui.Panel {
                                             visible: modelData.views_delta > 0
                                             height: Style.space(14)
                                             width: viewsDeltaText.implicitWidth + 6
-                                            radius: 3
+                                            radius: root.corners.small
                                             color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.25)
                                             Text { textFormat: Text.PlainText;
                                                 id: viewsDeltaText
@@ -838,7 +923,7 @@ Ui.Panel {
                                             visible: modelData.downloads_delta > 0
                                             height: Style.space(14)
                                             width: dlDeltaText.implicitWidth + 6
-                                            radius: 3
+                                            radius: root.corners.small
                                             color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.25)
                                             Text { textFormat: Text.PlainText;
                                                 id: dlDeltaText
@@ -916,7 +1001,7 @@ Ui.Panel {
                     Rectangle {
                         width: parent.width
                         height: historyColumn.implicitHeight + Style.space(16)
-                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        radius: root.corners.radius
                         color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.05)
                         border.width: 1
                         border.color: Commons.Color.popups.border
@@ -959,7 +1044,7 @@ Ui.Panel {
                                         width: Math.max(2, chart.slot * 0.7)
                                         height: modelData === null ? 2 : Math.max(modelData > 0 ? 3 : 1, (chart.height - Style.space(14)) * modelData / root.historyMax)
                                         anchors.bottom: parent.bottom
-                                        radius: Math.min(3, width / 2)
+                                        radius: Math.min(root.corners.small, 3, width / 2)
                                         color: modelData === null ? Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.15)
                                                                   : (root.hoveredBar === index ? Commons.Color.foreground : Commons.Color.accent)
                                         Text { textFormat: Text.PlainText; visible: modelData !== null && modelData > 0 && chart.count <= 12; anchors.bottom: parent.top; anchors.horizontalCenter: parent.horizontalCenter
@@ -990,7 +1075,7 @@ Ui.Panel {
                         width: parent.width
                         visible: root.confirmClearHistory
                         height: visible ? confirmColumn.implicitHeight + Style.space(16) : 0
-                        radius: (Style.cornerRadius > 0 ? Style.cornerRadius : 6)
+                        radius: root.corners.radius
                         color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.10)
                         border.width: 1
                         border.color: Commons.Color.accent
@@ -1010,6 +1095,7 @@ Ui.Panel {
                 }
             }
         }
+        } // end PanelShot
 
         // Resize grip on the edge away from the bar: drag changes the height only,
         // double-click goes back to fitting the content.
@@ -1048,7 +1134,7 @@ Ui.Panel {
                 anchors.centerIn: parent
                 width: Style.space(40)
                 height: Style.space(3)
-                radius: height / 2
+                radius: Math.min(root.corners.pill, height / 2)
                 color: Commons.Color.foreground
                 opacity: heightGrip.containsMouse || heightGrip.pressed ? 0.5 : 0.15
             }
