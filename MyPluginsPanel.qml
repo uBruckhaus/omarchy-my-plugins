@@ -95,6 +95,9 @@ Ui.Panel {
     }
 
     // A layer surface that takes the keyboard; the xdg-popup PopupCard never receives typing.
+    // See-through with the window style (Theme Manager → Settings).
+    PopupGlass { inside: shot; active: popup.open }
+
     Ui.KeyboardPanel {
         id: popup
         focusTarget: content
