@@ -17,6 +17,8 @@ import subprocess
 import re
 import time
 import zlib
+import signal
+import threading
 from pathlib import Path
 from datetime import date, datetime, timedelta, timezone
 from contextlib import contextmanager
@@ -238,9 +240,43 @@ def run_bounded(args, limit=2 * 1024 * 1024, timeout=10):
         proc.stdout.close()
 
 
+class _Deadline(Exception):
+    pass
+
+
+@contextmanager
+def hard_deadline(seconds):
+    """Interrupt whatever blocks (connect, TLS handshake, status line, headers, body) once
+    `seconds` have passed, via SIGALRM; a server dripping bytes below the socket timeout
+    cannot hold the request longer. Off the main thread signals are unavailable: then only
+    the per-call socket timeout and the body deadline apply (the panel's watchdog still ends the run)."""
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+
+    def on_alarm(_signum, _frame):
+        raise _Deadline()
+
+    previous = signal.signal(signal.SIGALRM, on_alarm)
+    signal.setitimer(signal.ITIMER_REAL, max(0.01, seconds))
+    try:
+        yield
+    except _Deadline:
+        raise ValueError("reply took too long") from None
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
+
+
 def http_get(url, limit, timeout=20, etag=None):
-    """GET with a byte cap and one overall deadline. Returns (status, body, etag);
-    status 304 means the cached copy is current. Raises ValueError on oversize/slow replies."""
+    """GET with a byte cap and one overall deadline (also over connect and headers).
+    Returns (status, body, etag); status 304 means the cached copy is current.
+    Raises ValueError on oversize/slow replies."""
+    with hard_deadline(timeout):
+        return _http_get(url, limit, timeout, etag)
+
+
+def _http_get(url, limit, timeout, etag):
     deadline = time.monotonic() + timeout
     headers = {"User-Agent": "OmarchyMyPlugins/1.2", "Accept-Encoding": "gzip"}
     if etag:

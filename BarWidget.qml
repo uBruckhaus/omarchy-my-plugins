@@ -130,6 +130,9 @@ ShellUi.BarWidget {
         if (payload.command === "query") {
             isQuerying = true
         }
+        // one waiting refresh is enough; the queue stays short (review #14096)
+        if (payload.command === "query" && pendingRequests.some(function(r) { return r.command === "query" })) return
+        if (pendingRequests.length >= 16) pendingRequests = pendingRequests.slice(1)
         pendingRequests = pendingRequests.concat([payload])
         processNextRequest()
     }
@@ -268,8 +271,24 @@ ShellUi.BarWidget {
                 root.acceptResponse(text)
             }
         }
+        onRunningChanged: {
+            if (running) workerWatchdog.restart()
+            else workerWatchdog.stop()
+        }
         onExited: {
             Qt.callLater(root.processNextRequest)
+        }
+    }
+
+    // Ends a helper run that hangs (the longest regular refresh needs about 2.5 minutes),
+    // so later refresh, settings, history and paste requests are not stuck behind it.
+    Timer {
+        id: workerWatchdog
+        interval: 240000
+        onTriggered: {
+            if (!worker.running) return
+            console.warn("My Plugins: helper took too long, stopped")
+            worker.running = false
         }
     }
 

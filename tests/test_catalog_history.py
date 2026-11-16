@@ -5,6 +5,7 @@ import os
 import socketserver
 import sys
 import tempfile
+import signal
 import threading
 import unittest
 from datetime import date
@@ -329,6 +330,34 @@ class HttpTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             monitor.http_get(base, 1024 * 1024, timeout=2)
         self.assertLess(time.monotonic() - start, 6)
+
+    def test_header_drip_hits_the_deadline(self):
+        """Review #14096: status line and headers dripped below the socket timeout."""
+        import time
+        class HeaderDrip(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a): pass
+            def do_GET(self):
+                try:
+                    for ch in b"HTTP/1.1 200 OK\r\nX-Slow: " + b"a" * 200:
+                        self.wfile.write(bytes([ch])); self.wfile.flush(); time.sleep(0.2)
+                except Exception:
+                    pass
+        base = self.serve(HeaderDrip)
+        start = time.monotonic()
+        with self.assertRaises(ValueError):
+            monitor.http_get(base, 1024 * 1024, timeout=2)
+        self.assertLess(time.monotonic() - start, 4)
+        self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0.0, 0.0))   # alarm cleared
+        self.assertIs(signal.getsignal(signal.SIGALRM), signal.SIG_DFL)      # handler restored
+
+    def test_silent_server_hits_the_deadline(self):
+        import socket, time
+        listener = socket.socket(); listener.bind(("127.0.0.1", 0)); listener.listen(1)
+        self.addCleanup(listener.close)
+        start = time.monotonic()
+        with self.assertRaises(ValueError):    # accepted by the kernel, never answered
+            monitor.http_get(f"http://127.0.0.1:{listener.getsockname()[1]}/", 1024, timeout=1)
+        self.assertLess(time.monotonic() - start, 3)
 
 
 if __name__ == "__main__":

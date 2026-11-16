@@ -64,7 +64,8 @@ your own `gh` login, the repository list (name, description, stars; up to 300, p
 included) of each account or organization that holds one of your listed plugins, your marketplace issues and the
 list of GitHub organizations you belong to (`gh api user/orgs`, which can include private memberships;
 it is only used to match catalog entries and is not stored). Every download and helper output has
-a size cap and an overall deadline, redirects are refused, and links open only for `github.com` and
+a size cap and an overall deadline (for downloads it also covers connecting and the reply headers), the panel stops a
+helper run after 4 minutes, redirects are refused, and links open only for `github.com` and
 `plugins.omarchy.org`. Nothing is sent anywhere; settings, the catalog cache and the history stay in
 `~/.config/omarchy/my-plugins` and `~/.local/state/omarchy/my-plugins`. F12 pictures and notes (see above) stay in `~/Pictures/My Plugins/`.
 
